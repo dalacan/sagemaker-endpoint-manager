@@ -56,3 +56,7 @@ command.
  * `cdk docs`        open CDK documentation
 
 Enjoy!
+
+## References
+
+Building an API Gateway with CDK - https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_apigateway/README.html#lambda-based-request-authorizer

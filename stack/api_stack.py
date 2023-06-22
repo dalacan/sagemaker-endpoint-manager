@@ -1,5 +1,6 @@
 from aws_cdk import (
     # Duration,
+    RemovalPolicy,
     Stack,
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
@@ -10,7 +11,7 @@ from constructs import Construct
 
 class APIStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, lambda_stack, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, lambda_stack, endpoint_manager_stack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # DynamoDB table for authentication
@@ -18,7 +19,8 @@ class APIStack(Stack):
 
         auth_db = dynamodb.Table(self, "AuthTable",
                                  table_name=table_name,
-                                 partition_key=dynamodb.Attribute(name="token", type=dynamodb.AttributeType.STRING))
+                                 partition_key=dynamodb.Attribute(name="token", type=dynamodb.AttributeType.STRING),
+                                 removal_policy=RemovalPolicy.DESTROY)
 
         # Auth handler function
         auth_handler = _lambda.Function(self, "AuthHandler",
@@ -40,11 +42,19 @@ class APIStack(Stack):
                   rest_api_name="Foundation Model API Service",
                   description="This service serves all the foundation models.")
 
-        self.get_model_integration = apigateway.LambdaIntegration(lambda_stack.app_handler,
+        self.post_model_integration = apigateway.LambdaIntegration(lambda_stack.app_handler,
                                                                   request_templates={"application/json": '{ "statusCode": "200" }'})
         # Add lambda to api
         resource = self.api.root.add_resource(lambda_stack.resource_name)
-        resource.add_method("POST", self.get_model_integration, authorizer=self.authorizer)
+        resource.add_method("POST", self.post_model_integration, authorizer=self.authorizer)
+
+        # Update expiry api integration
+        self.post_update_expiry_integration = apigateway.LambdaIntegration(endpoint_manager_stack.update_expiry_handler,
+                                                                  request_templates={"application/json": '{ "statusCode": "200" }'})
+        # Add lambda to api
+        resource = self.api.root.add_resource('endpoint-expiry')
+        resource.add_method("POST", self.post_update_expiry_integration, authorizer=self.authorizer)
+        resource.add_method("GET", self.post_update_expiry_integration, authorizer=self.authorizer)
 
         # # Lambda
         # app_handler = _lambda.Function(self, "StableDiffusionHandler",

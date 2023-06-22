@@ -19,7 +19,6 @@ class SageMakerAsyncEndpointConstruct(Construct):
         instance_count: int,
         instance_type: str,
         environment: dict,
-        model_suffix: str,
         success_topic: str,
         error_topic: str,
         s3_async_bucket: str,

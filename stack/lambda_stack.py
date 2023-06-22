@@ -9,7 +9,7 @@ from constructs import Construct
 
 class LambdaStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, resource_name, asset_dir, model_stack, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, resource_name, asset_dir, endpoint_name, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Create lambda
@@ -19,23 +19,17 @@ class LambdaStack(Stack):
                 handler="app.handler",
                 timeout=Duration.seconds(180),
                 environment={
-                    "ENDPOINT_NAME": model_stack.endpoint.endpoint_name,
+                    "ENDPOINT_NAME": endpoint_name,
                 })
         
-        # print(model_stack.endpoint.endpoint.__dir__())
-
-        # print(model_stack.endpoint.endpoint.ref)
-
-        # print(model_stack.endpoint.endpoint.get_att('EndpointArn'))
+        # 
+        endpoint_arn = f'arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}'
+    
         self.app_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=["sagemaker:InvokeEndpoint"],
-            resources=[
-                model_stack.endpoint.endpoint.ref
-            ],
+            resources=[endpoint_arn],
         ))
 
-       
-        
         self.resource_name = resource_name
 

@@ -19,7 +19,6 @@ class SageMakerEndpointConstruct(Construct):
         instance_count: int,
         instance_type: str,
         environment: dict,
-        model_suffix: str,
         deploy_enable: bool) -> None:
         super().__init__(scope, construct_id)
         
@@ -35,7 +34,7 @@ class SageMakerEndpointConstruct(Construct):
                            model_name= f"{project_prefix}-{model_name}-Model"
         )
         
-        config = sagemaker.CfnEndpointConfig(self, f"{model_name}-Config",
+        self.config = sagemaker.CfnEndpointConfig(self, f"{model_name}-Config",
                             production_variants=[
                                 sagemaker.CfnEndpointConfig.ProductionVariantProperty(
                                     model_name= model.attr_model_name,
@@ -51,7 +50,7 @@ class SageMakerEndpointConstruct(Construct):
         if deploy_enable:
             self.endpoint = sagemaker.CfnEndpoint(self, f"{model_name}-Endpoint",
                                 endpoint_name= f"{project_prefix}-{model_name}-Endpoint",
-                                endpoint_config_name= config.attr_endpoint_config_name
+                                endpoint_config_name= self.config.attr_endpoint_config_name
             )
             
             CfnOutput(scope=self,id=f"{model_name}EndpointName", value=self.endpoint.endpoint_name)

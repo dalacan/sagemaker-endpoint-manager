@@ -15,10 +15,8 @@ from stack.lambda_stack import LambdaStack
 ####################################################################################################
 # Define configurations
 region_name = "us-east-1"
-async_inference = False
 initial_provision_time_minutes=60
 project_prefix = "demo"
-
 
 # Select an example model endpoint to deploy
 # Flan Model example
@@ -30,7 +28,7 @@ project_prefix = "demo"
 
 # Falcon 40B Model example
 model_name="Falcon40B"
-MODEL_ID = "huggingface-textgeneration-falcon-40b-instruct-bf16"
+MODEL_ID = "huggingface-llm-falcon-40b-instruct-bf16"
 INFERENCE_INSTANCE_TYPE = "ml.g5.12xlarge"
 LAMBDA_SRC = "api/falcon"
 API_RESOURCE ="falcon"
@@ -69,7 +67,7 @@ fm_async_stack = FoundationModelAsyncStack(app, "ModelAsyncStack",
 )
 
 # Deploy lambda-sagemaker endpoint integration
-lambda_stack = LambdaStack(app, "FlanT5LambdaStack", 
+lambda_stack = LambdaStack(app, "ModelLambdaStack", 
                            env=environment,
                            resource_name=API_RESOURCE,
                            asset_dir=LAMBDA_SRC,

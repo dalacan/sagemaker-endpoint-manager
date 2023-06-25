@@ -117,7 +117,6 @@ class FoundationModelAsyncStack(Stack):
                             "SAGEMAKER_REGION": model_info["region_name"],
                             "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
                         },
-                        model_suffix = model_suffix,
                         deploy_enable = True,
 
                         success_topic=success_topic.topic_arn,

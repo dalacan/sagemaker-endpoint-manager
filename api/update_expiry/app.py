@@ -41,7 +41,12 @@ def handler(event, context):
                     WithDecryption=False)
         
             current_expiry = datetime.strptime(expiry_parameter['Parameter']['Value'], '%d-%m-%Y-%H-%M-%S')
+
+            # Check if current expiry is in the past
             now = datetime.utcnow()
+            if current_expiry < now:
+                current_expiry = now
+        
             expiry = current_expiry + timedelta(minutes=body['minutes'])
             expiry_str = expiry.strftime("%d-%m-%Y-%H-%M-%S")
 

@@ -8,14 +8,14 @@ from aws_cdk import (
 
 from constructs import Construct
 
-from construct.sagemaker_endpoint_construct import SageMakerEndpointConstruct
 from construct.sagemaker_async_endpoint_construct import SageMakerAsyncEndpointConstruct
 
 from datetime import datetime
+from stack.util import merge_env
 
 class FoundationModelAsyncStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, project_prefix, model_name, model_info, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, project_prefix, model_name, model_info, model_env, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         role = iam.Role(self, "Gen-AI-SageMaker-Policy", assumed_by=iam.ServicePrincipal("sagemaker.amazonaws.com"))
@@ -92,6 +92,19 @@ class FoundationModelAsyncStack(Stack):
         role.attach_inline_policy(sns_policy)
         role.attach_inline_policy(s3_policy)
 
+        environment = {
+                            "MODEL_CACHE_ROOT": "/opt/ml/model",
+                            "SAGEMAKER_ENV": "1",
+                            "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
+                            "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
+                            "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
+                            "SAGEMAKER_PROGRAM": "inference.py",
+                            "SAGEMAKER_REGION": model_info["region_name"],
+                            "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+                        }
+
+        environment = merge_env(environment, model_env)
+
         self.endpoint = SageMakerAsyncEndpointConstruct(self, "FoundationModelEndpoint",
                         project_prefix = project_prefix,
                         
@@ -107,16 +120,7 @@ class FoundationModelAsyncStack(Stack):
                         instance_count = 1,
                         instance_type = model_info["instance_type"],
 
-                        environment = {
-                            "MODEL_CACHE_ROOT": "/opt/ml/model",
-                            "SAGEMAKER_ENV": "1",
-                            "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
-                            "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
-                            "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
-                            "SAGEMAKER_PROGRAM": "inference.py",
-                            "SAGEMAKER_REGION": model_info["region_name"],
-                            "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
-                        },
+                        environment = environment,
                         deploy_enable = True,
 
                         success_topic=success_topic.topic_arn,

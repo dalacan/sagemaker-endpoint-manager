@@ -71,6 +71,7 @@ fm_async_stack = FoundationModelAsyncStack(app, "ModelAsyncStack",
                                             project_prefix = project_prefix, 
                                             model_name=model_name, 
                                             model_info=MODEL_INFO,
+                                            model_env=MODEL_ENV
 )
 
 # Deploy lambda-sagemaker endpoint integration

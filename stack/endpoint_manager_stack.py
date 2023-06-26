@@ -47,7 +47,7 @@ class EndpointManagerStack(Stack):
         # Add SSM read access
         start_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
-            actions=["ssm:DescribeParameters", "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters"],
+            actions=["ssm:DescribeParameters", "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:GetParametersByPath"],
             resources=[
                 ssm_arn
             ],
@@ -64,13 +64,13 @@ class EndpointManagerStack(Stack):
                 handler="app.handler",
                 timeout=Duration.seconds(30),
                 environment={
-                    "SSM_ENDPOINT_EXPIRY_PARAMETER": f"/sagemaker/endpoint/expiry{endpoint_name}"
+                    "SSM_ENDPOINT_EXPIRY_PARAMETER": f"/sagemaker/endpoint/expiry/{endpoint_name}"
                 })
 
         # Add SSM read/write policy
         self.update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
-            actions=["ssm:DescribeParameters", "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:PutParameter"],
+            actions=["ssm:DescribeParameters", "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:PutParameter", "ssm:GetParametersByPath"],
             resources=[
                 ssm_arn
             ],

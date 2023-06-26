@@ -8,28 +8,80 @@ from datetime import datetime, timedelta
 ssm_client = boto3.client("ssm")
 SSM_ENDPOINT_EXPIRY_PARAMETER = os.environ['SSM_ENDPOINT_EXPIRY_PARAMETER']
 
+def get_expiry(expiry_parameter_values):
+    expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')
+    now = datetime.utcnow()
+    time_left = expiry - now
+
+
+    endpoint_expiry_info = {
+        "EndpointName": expiry_parameter_values['endpoint_name'],
+        "EndpointExpiry ": expiry_parameter_values['expiry'],
+        "TimeLeft": str(time_left)
+    }
+
+    return endpoint_expiry_info
+
 def handler(event, context):
     http_method = event['httpMethod']
 
+    print(event)
+
     if http_method == "GET":
+        if event['queryStringParameters'] is not None and 'EndpointName' in event['queryStringParameters']:
+            print("Getting specific endpoint")
+            # Get expiry
+            expiry_parameter = ssm_client.get_parameter(
+                Name=f"/sagemaker/endpoint/expiry/{event['queryStringParameters']['EndpointName']}",
+                WithDecryption=False)
+            expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
+            
+            endpoint_expiry_info = get_expiry(expiry_parameter_values)
+
+            response =  {
+                "statusCode": 200,
+                "headers": {
+                    "Content-Type": "application/json"
+                },
+                "body": json.dumps(endpoint_expiry_info)
+            }
+        else:
+            print("Getting list of endpoint expiry")
+            # Get a list of endpoint expiry parameters
+            ssm_response = ssm_client.get_parameters_by_path(
+                Path="/sagemaker/endpoint/expiry/",
+                Recursive=True)
+            result = ssm_response["Parameters"]
+
+            
+            while "NextToken" in ssm_response:
+                ssm_response = ssm_client.get_parameters_by_path(
+                    Path="/sagemaker/endpoint/expiry/",
+                    Recursive=True,
+                    NextToken=result["NextToken"])
+                result.extend(ssm_response["Parameters"])
+
+            # Process each endpoint expiry configuration
+            endpoint_expiry_info = []
+            for parameter in result:
+                print("Processing endpoint")
+                parameter_values = json.loads(parameter['Value'])
+                endpoint_expiry_info.append(get_expiry(parameter_values))
+
         # Get expiry
-        expiry_parameter = ssm_client.get_parameter(
-            Name=SSM_ENDPOINT_EXPIRY_PARAMETER,
-            WithDecryption=False)
-        expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
-        expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')
-        now = datetime.utcnow()
-        time_left = expiry - now
+        # expiry_parameter = ssm_client.get_parameter(
+        #     Name=SSM_ENDPOINT_EXPIRY_PARAMETER,
+        #     WithDecryption=False)
+        # expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
+        
+        # endpoint_expiry_info = get_expiry(expiry_parameter_values)
 
         response =  {
             "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json"
             },
-            "body": json.dumps({
-                "EndpointExpiry ": expiry_parameter['Parameter']['Value'],
-                "TimeLeft": str(time_left)
-            })
+            "body": json.dumps(endpoint_expiry_info)
         }
     elif http_method == "POST":
         if event['body'] is not None :

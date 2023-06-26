@@ -9,24 +9,25 @@ runtime= boto3.client('runtime.sagemaker')
 
 def handler(event, context):
     
-    data = json.loads(json.dumps(event))
-    payload = json.loads(data['body'])
+    # data = json.loads(json.dumps(event))
+    # payload = json.loads(data['body'])
+
+    payload = event['body']
 
     client = boto3.client('runtime.sagemaker')
     response = client.invoke_endpoint(
         EndpointName=ENDPOINT_NAME, 
-        ContentType='application/json', 
-        Body=json.dumps(payload).encode('utf-8')
+        ContentType='application/json',
+        Accept='application/json',
+        Body=payload
     )
-
+    
     result = {
         "statusCode": 200,
         "headers": {
                 'Content-Type': 'text/json'
                     },
-        "body": json.dumps(
-            json.loads(response["Body"].read())
-            )
+        "body": response["Body"].read()
     }
     
     return result

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 from script.sagemaker_uri import *
+from script.sagemaker_env import *
+
 
 import aws_cdk as cdk
 
@@ -37,6 +39,11 @@ MODEL_INFO = get_sagemaker_uris(model_id=MODEL_ID,
                                         instance_type=INFERENCE_INSTANCE_TYPE,
                                         region_name=region_name)
 
+# Get model default environment parameters
+MODEL_ENV = sagemaker_env(model_id=MODEL_ID,
+                          region=region_name,
+                          model_version="*")
+
 # Define region to deploy stack into
 environment = cdk.Environment(region=region_name)
 ####################################################################################################
@@ -47,15 +54,15 @@ fm_stack = FoundationModelRealtimeStack(app, "ModelMeteredStack",
                                 project_prefix = project_prefix, 
                                 model_name=model_name, 
                                 model_info=MODEL_INFO,
+                                model_env=MODEL_ENV,
+                                initial_provision_time_minutes=initial_provision_time_minutes,
                                 deploy_enable=False
 )
 
 endpoint_manager_stack = EndpointManagerStack(app, "EndpointManagerStack",
                                               env=environment,
                                               project_prefix=project_prefix,
-                                              model_name=model_name,
-                                              initial_provision_time_minutes=initial_provision_time_minutes,
-                                              model_stack=fm_stack
+                                              model_name=model_name
 )
 
 # Deploys an async version of the model

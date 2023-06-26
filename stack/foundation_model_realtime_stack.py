@@ -1,14 +1,18 @@
 from aws_cdk import (
     Stack,
-    aws_iam as iam
+    aws_iam as iam,
+    aws_ssm as ssm
 )
 
 from constructs import Construct
 from construct.sagemaker_endpoint_construct import SageMakerEndpointConstruct
 
+import json
+from datetime import datetime, timedelta
+from stack.util import merge_env
 class FoundationModelRealtimeStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, project_prefix, model_name, model_info, deploy_enable, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, project_prefix, model_name, model_info, model_env, initial_provision_time_minutes, deploy_enable, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         role = iam.Role(self, "Gen-AI-SageMaker-Policy", assumed_by=iam.ServicePrincipal("sagemaker.amazonaws.com"))
@@ -52,6 +56,19 @@ class FoundationModelRealtimeStack(Stack):
         role.attach_inline_policy(sts_policy)
         role.attach_inline_policy(logs_policy)
         role.attach_inline_policy(ecr_policy)
+
+        environment = {
+                            "MODEL_CACHE_ROOT": "/opt/ml/model",
+                            "SAGEMAKER_ENV": "1",
+                            "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
+                            "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
+                            "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
+                            "SAGEMAKER_PROGRAM": "inference.py",
+                            "SAGEMAKER_REGION": model_info["region_name"],
+                            "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+                        }
+
+        environment = merge_env(environment, model_env)
         
         self.endpoint = SageMakerEndpointConstruct(self, "FoundationModelEndpoint",
                                     project_prefix = project_prefix,
@@ -68,16 +85,7 @@ class FoundationModelRealtimeStack(Stack):
                                     instance_count = 1,
                                     instance_type = model_info["instance_type"],
 
-                                    environment = {
-                                        "MODEL_CACHE_ROOT": "/opt/ml/model",
-                                        "SAGEMAKER_ENV": "1",
-                                        "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
-                                        "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
-                                        "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
-                                        "SAGEMAKER_PROGRAM": "inference.py",
-                                        "SAGEMAKER_REGION": model_info["region_name"],
-                                        "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
-                                    },
+                                    environment = environment,
                                     deploy_enable = deploy_enable
         )
         
@@ -85,5 +93,20 @@ class FoundationModelRealtimeStack(Stack):
         self.endpoint.node.add_dependency(sts_policy)
         self.endpoint.node.add_dependency(logs_policy)
         self.endpoint.node.add_dependency(ecr_policy)
+
+        endpoint_name = f"{project_prefix}-{model_name}-Endpoint"
+
+        # Set endpoint expiry
+        now = datetime.utcnow()
+        expiry = now + timedelta(minutes=initial_provision_time_minutes)
+
+        expiry_ssm_value = {
+            "expiry": expiry.strftime("%d-%m-%Y-%H-%M-%S"),
+            "endpoint_name": endpoint_name,
+            "endpoint_config_name": self.endpoint.config.attr_endpoint_config_name
+        }
+
+        # Create default SSM parameter to manage endpoint
+        expiry_ssm = ssm.StringParameter(self, f"{endpoint_name}-expiry", parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", string_value=json.dumps(expiry_ssm_value))
                                                                              
         

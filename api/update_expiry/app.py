@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 # grab environment variables
 ssm_client = boto3.client("ssm")
-ENDPOINT_NAME = os.environ['ENDPOINT_NAME']
+SSM_ENDPOINT_EXPIRY_PARAMETER = os.environ['SSM_ENDPOINT_EXPIRY_PARAMETER']
 
 def handler(event, context):
     http_method = event['httpMethod']
@@ -14,10 +14,10 @@ def handler(event, context):
     if http_method == "GET":
         # Get expiry
         expiry_parameter = ssm_client.get_parameter(
-            Name=f"{ENDPOINT_NAME}-expiry",
+            Name=SSM_ENDPOINT_EXPIRY_PARAMETER,
             WithDecryption=False)
-        
-        expiry = datetime.strptime(expiry_parameter['Parameter']['Value'], '%d-%m-%Y-%H-%M-%S')
+        expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
+        expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')
         now = datetime.utcnow()
         time_left = expiry - now
 
@@ -37,10 +37,12 @@ def handler(event, context):
             body = json.loads(event["body"])
 
             expiry_parameter = ssm_client.get_parameter(
-                    Name=f"{ENDPOINT_NAME}-expiry",
+                    Name=SSM_ENDPOINT_EXPIRY_PARAMETER,
                     WithDecryption=False)
+            
+            expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
         
-            current_expiry = datetime.strptime(expiry_parameter['Parameter']['Value'], '%d-%m-%Y-%H-%M-%S')
+            current_expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')
 
             # Check if current expiry is in the past
             now = datetime.utcnow()
@@ -52,11 +54,14 @@ def handler(event, context):
 
             time_left = expiry - now
 
+            expiry_parameter_values['expiry'] = expiry_str
+
             # Update parameter
             ssm_response = ssm_client.put_parameter(
-                Name=f"{ENDPOINT_NAME}-expiry",
+                Name=SSM_ENDPOINT_EXPIRY_PARAMETER,
                 Overwrite=True,
-                Value=expiry_str)
+                Value=json.dumps(expiry_parameter_values)
+            )
 
             response =  {
                 "statusCode": 200,

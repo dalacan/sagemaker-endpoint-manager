@@ -191,8 +191,6 @@ def create_update_endpoint_expiry(event):
 def handler(event, context):
     http_method = event['httpMethod']
 
-    print(event)
-
     if http_method == "GET":
         response = get_endpoint_expiry_info(event)
     elif http_method == "POST":

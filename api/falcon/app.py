@@ -1,16 +1,11 @@
 import os
 import boto3
-import json
-
 
 # grab environment variables
 ENDPOINT_NAME = os.environ['ENDPOINT_NAME']
 runtime= boto3.client('runtime.sagemaker')
 
 def handler(event, context):
-    
-    # data = json.loads(json.dumps(event))
-    # payload = json.loads(data['body'])
 
     payload = event['body']
 

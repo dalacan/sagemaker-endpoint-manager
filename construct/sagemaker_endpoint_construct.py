@@ -22,6 +22,7 @@ class SageMakerEndpointConstruct(Construct):
         deploy_enable: bool) -> None:
         super().__init__(scope, construct_id)
         
+        # Do not use a custom named resource for models as these get replaced
         model = sagemaker.CfnModel(self, f"{model_name}-Model",
                            execution_role_arn= role_arn,
                            containers=[
@@ -30,8 +31,7 @@ class SageMakerEndpointConstruct(Construct):
                                         model_data_url= f"s3://{model_bucket_name}/{model_bucket_key}",
                                         environment= environment
                                     )
-                               ],
-                           model_name= f"{project_prefix}-{model_name}-Model"
+                               ]
         )
         
         self.config = sagemaker.CfnEndpointConfig(self, f"{model_name}-Config",

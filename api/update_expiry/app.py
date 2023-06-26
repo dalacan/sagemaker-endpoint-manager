@@ -87,7 +87,7 @@ def create_endpoint_config(endpoint_name, endpoint_config_name, provision_minute
 
     # Add new parameter
     ssm_response = ssm_client.put_parameter(
-        Name=f"/sagemaker/endpoint/expiry/{endpoint_name.lower()}",
+        Name=f"/sagemaker/endpoint/expiry/{endpoint_name}",
         Type="String",
         Overwrite=True,
         Value=json.dumps(expiry_ssm_value)

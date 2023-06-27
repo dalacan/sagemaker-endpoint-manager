@@ -33,41 +33,25 @@ class APIStack(Stack):
         
         auth_db.grant_read_data(auth_handler)
                                         
-        self.authorizer = apigateway.RequestAuthorizer(self, "StableDiffusionAuthorizer",
+        authorizer = apigateway.RequestAuthorizer(self, "StableDiffusionAuthorizer",
             handler=auth_handler,
             identity_sources=[apigateway.IdentitySource.header("Authorization")]
         )
 
-        self.api = apigateway.RestApi(self, "FoundationModelAPI",
+        api = apigateway.RestApi(self, "FoundationModelAPI",
                   rest_api_name="Foundation Model API Service",
                   description="This service serves all the foundation models.")
 
-        self.post_model_integration = apigateway.LambdaIntegration(lambda_stack.app_handler,
+        post_model_integration = apigateway.LambdaIntegration(lambda_stack.app_handler,
                                                                   request_templates={"application/json": '{ "statusCode": "200" }'})
         # Add lambda to api
-        resource = self.api.root.add_resource(lambda_stack.resource_name)
-        resource.add_method("POST", self.post_model_integration, authorizer=self.authorizer)
+        resource = api.root.add_resource(lambda_stack.resource_name)
+        resource.add_method("POST", post_model_integration, authorizer=authorizer)
 
         # Update expiry api integration
-        self.post_update_expiry_integration = apigateway.LambdaIntegration(endpoint_manager_stack.update_expiry_handler,
+        post_update_expiry_integration = apigateway.LambdaIntegration(endpoint_manager_stack.update_expiry_handler,
                                                                   request_templates={"application/json": '{ "statusCode": "200" }'})
         # Add lambda to api
-        resource = self.api.root.add_resource('endpoint-expiry')
-        resource.add_method("POST", self.post_update_expiry_integration, authorizer=self.authorizer)
-        resource.add_method("GET", self.post_update_expiry_integration, authorizer=self.authorizer)
-
-        # # Lambda
-        # app_handler = _lambda.Function(self, "StableDiffusionHandler",
-        #         runtime=_lambda.Runtime.PYTHON_3_9,
-        #         code=_lambda.Code.from_asset("api/text2text"),
-        #         handler="app.handler")
-
-        # get_stable_diffusion_integration = apigateway.LambdaIntegration(app_handler,
-        #         request_templates={"application/json": '{ "statusCode": "200" }'})
-
-        # books = self.api.root.add_resource("books")
-        # books.add_method("GET")
-        # self.api.root.add_method("GET", get_stable_diffusion_integration, authorizer=authorizer)   # GET /
-
-        # Deploy sagemaker model
-
+        resource = api.root.add_resource('endpoint-expiry')
+        resource.add_method("POST", post_update_expiry_integration, authorizer=authorizer)
+        resource.add_method("GET", post_update_expiry_integration, authorizer=authorizer)

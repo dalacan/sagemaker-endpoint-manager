@@ -314,6 +314,7 @@ cdk deploy ModelAsyncStack
 - [x] Add support for multiple endpoints
 - [x] Add support for managing existing endpoints
 - [x] Add support for adding new endpoints via API
+- [ ] Add support for scheduled endpoints (i.e. M-F 9-5)
 - [ ] Add support for cognito users
 - [ ] Add support for expiry notifications
 - [ ] Add UI to manage endpoint expiry

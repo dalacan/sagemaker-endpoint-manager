@@ -31,8 +31,6 @@ class EndpointManagerStack(Stack):
                     "SSM_ENDPOINT_EXPIRY_PARAMETER": f"/sagemaker/endpoint/expiry/{endpoint_name}"
                 })
 
-        # endpoint_arn = f"arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}"
-
         # Add policy to lambda to create endpoint
         start_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
@@ -75,6 +73,3 @@ class EndpointManagerStack(Stack):
                 ssm_arn
             ],
         ))
-        
-                                                                             
-        

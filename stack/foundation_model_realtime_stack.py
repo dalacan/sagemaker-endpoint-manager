@@ -70,7 +70,7 @@ class FoundationModelRealtimeStack(Stack):
 
         environment = merge_env(environment, model_env)
         
-        self.endpoint = SageMakerEndpointConstruct(self, "FoundationModelEndpoint",
+        endpoint = SageMakerEndpointConstruct(self, "FoundationModelEndpoint",
                                     project_prefix = project_prefix,
                                     
                                     role_arn= role.role_arn,
@@ -89,10 +89,10 @@ class FoundationModelRealtimeStack(Stack):
                                     deploy_enable = deploy_enable
         )
         
-        self.endpoint.node.add_dependency(role)
-        self.endpoint.node.add_dependency(sts_policy)
-        self.endpoint.node.add_dependency(logs_policy)
-        self.endpoint.node.add_dependency(ecr_policy)
+        endpoint.node.add_dependency(role)
+        endpoint.node.add_dependency(sts_policy)
+        endpoint.node.add_dependency(logs_policy)
+        endpoint.node.add_dependency(ecr_policy)
 
         endpoint_name = f"{project_prefix}-{model_name}-Endpoint"
 
@@ -103,10 +103,13 @@ class FoundationModelRealtimeStack(Stack):
         expiry_ssm_value = {
             "expiry": expiry.strftime("%d-%m-%Y-%H-%M-%S"),
             "endpoint_name": endpoint_name,
-            "endpoint_config_name": self.endpoint.config.attr_endpoint_config_name
+            "endpoint_config_name": endpoint.config.attr_endpoint_config_name
         }
 
         # Create default SSM parameter to manage endpoint
-        expiry_ssm = ssm.StringParameter(self, f"{endpoint_name}-expiry", parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", string_value=json.dumps(expiry_ssm_value))
+        expiry_ssm = ssm.StringParameter(self, 
+                                         f"{endpoint_name}-expiry", 
+                                         parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", 
+                                         string_value=json.dumps(expiry_ssm_value))
                                                                              
         

@@ -1,11 +1,11 @@
 
 # Deploying a auto start/stop Amazon SageMaker Foundation Model endpoint backed by a API Gateway/Lambda
 
-This demo code provides you with a template to develop an integration with an Amazon SageMaker foundation model fronted by a serverless API with a simple dynamodb authorizer using CDK.
+This demo code will walk you through on how to deploy an Amazon SageMaker foundation model fronted by a serverless API with a basic dynamodb authorizer using CDK.
 
-The real-time endpoint also features a automatic start/stop functionality by setting an expiry datetime for the endpoint. Similar to a parking meter whereby you top up credits to ensure that your parking does not expire, in this case, you keep renewing the endpoint expiry date time to keep it running.
+In this demo we will also deploy a mechanism to manage our real-time endpoint which features an automatic start/stop functionality by setting an expiry datetime for the endpoint. Similar to a parking meter whereby you top up credits to ensure that your parking does not expire, in this case, you keep renewing the endpoint expiry date time to keep it running.
 
-This solution was implemented to solve a recurring problem with users leaving their Amazon SageMaker endpoint on and forgetting to turn it off. One way of solving it is to implement a schedule, however having to constantly set a pre-defined datetime can be cumbersome as schedules can change. Instead by intentionally forcing the user to top up tokens can raise the awareness of the cost of the endpoint (particularly for LLM endpoint) and also ensure that the user is intentional in how much more time they need to use the endpoint for testing.
+This solution was designed to solve a recurring problem with users leaving their Amazon SageMaker endpoint on and forgetting to delete them after usage. The approach taken solve this in the first iteration is to enforce users to renew their endpoint expiry times based on when they need it. By doing so, it raises the awareness of the cost of the endpoint (particularly for LLM endpoint) and also ensure that the user is intentional in how much more time they need to use the endpoint for testing.
 
 ## Table of contents
 - [Deploying a auto start/stop Amazon SageMaker Foundation Model endpoint backed by a API Gateway/Lambda](#deploying-a-auto-startstop-amazon-sagemaker-foundation-model-endpoint-backed-by-a-api-gatewaylambda)
@@ -18,6 +18,8 @@ This solution was implemented to solve a recurring problem with users leaving th
   - [Real-time Endpoint Management Functions - Adding a new real-time endpoint](#real-time-endpoint-management-functions---adding-a-new-real-time-endpoint)
   - [Interacting with your real-time endpoint via API](#interacting-with-your-real-time-endpoint-via-api)
   - [Deploying an async endpoint (WIP)](#deploying-an-async-endpoint-wip)
+  - [Example Notebook](#example-notebook)
+  - [The notebook will show you how to manage your endpoint, interact with your SageMaker endpoint API And how to use Langchain with APIGateway.](#the-notebook-will-show-you-how-to-manage-your-endpoint-interact-with-your-sagemaker-endpoint-api-and-how-to-use-langchain-with-apigateway)
   - [How does the endpoint manager work?](#how-does-the-endpoint-manager-work)
   - [To Do](#to-do)
   - [References](#references)
@@ -299,6 +301,12 @@ If you'd like to deploy an asynchronous foundational model endpoint, follow this
 ```
 cdk deploy ModelAsyncStack
 ```
+---
+## Example Notebook
+
+You can also interact with the API gateway via notebook. To do so, clone this repository or copy `00-api_gateway_managed_endpoint.ipynb` to your notebook environment (i.e. Amazon SageMaker Studio) and run through the instructions in the notebook.
+
+The notebook will show you how to manage your endpoint, interact with your SageMaker endpoint API And how to use Langchain with APIGateway.
 ---
 ## How does the endpoint manager work?
 

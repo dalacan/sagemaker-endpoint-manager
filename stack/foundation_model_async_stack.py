@@ -105,7 +105,7 @@ class FoundationModelAsyncStack(Stack):
 
         environment = merge_env(environment, model_env)
 
-        self.endpoint = SageMakerAsyncEndpointConstruct(self, "FoundationModelEndpoint",
+        endpoint = SageMakerAsyncEndpointConstruct(self, "FoundationModelEndpoint",
                         project_prefix = project_prefix,
                         
                         role_arn= role.role_arn,
@@ -127,8 +127,8 @@ class FoundationModelAsyncStack(Stack):
                         error_topic=error_topic.topic_arn,
                         s3_async_bucket=s3_async.bucket_name,
         )
-        self.endpoint.node.add_dependency(role)
-        self.endpoint.node.add_dependency(sts_policy)
-        self.endpoint.node.add_dependency(logs_policy)
-        self.endpoint.node.add_dependency(ecr_policy)
+        endpoint.node.add_dependency(role)
+        endpoint.node.add_dependency(sts_policy)
+        endpoint.node.add_dependency(logs_policy)
+        endpoint.node.add_dependency(ecr_policy)
         

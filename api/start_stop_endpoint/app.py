@@ -31,6 +31,11 @@ def start_stop_endpoint(expiry_parameter_values):
             describe_response = sagemaker_client.describe_endpoint(
                 EndpointName=expiry_parameter_values['endpoint_name']
             )
+
+            # Check if endpoint creation failed, it it has, delete it so that it can be created
+            if describe_response['EndpointStatus'] == 'Failed':
+                print("Endpoint creation failed, deleting endpoint")
+                sagemaker_client.delete_endpoint(EndpointName=expiry_parameter_values['endpoint_name'])
         except botocore.exceptions.ClientError as error:
             # Endpoint does not exist, create endpoint
             if error.response['Error']['Code'] == 'ValidationException':
@@ -39,8 +44,9 @@ def start_stop_endpoint(expiry_parameter_values):
                     create_endpoint_response = create_endpoint(expiry_parameter_values['endpoint_name'], expiry_parameter_values['endpoint_config_name'])
                 except botocore.exceptions.ClientError as error:
                     print("Error creating endpoint")
-
-            print(error)
+            else:
+                print("Error describing endpoint")
+                print(error)
 
 def create_endpoint(endpoint_name, endpoint_config_name):
     return sagemaker_client.create_endpoint(

@@ -1,25 +1,37 @@
 
-# Deploying a auto start/stop Amazon SageMaker Foundation Model endpoint backed by a API Gateway/Lambda
+# Amazon SageMaker Endpoint Manager
 
-This demo code will walk you through on how to deploy an Amazon SageMaker foundation model fronted by a serverless API with a basic dynamodb authorizer using CDK.
+A solution that will allow you to deploy Amazon SageMaker Foundation Model endpoint backed by a API Gateway/Lambda with automation to start and stop your endpoints.
 
-In this demo we will also deploy a mechanism to manage our real-time endpoint which features an automatic start/stop functionality by setting an expiry datetime for the endpoint. Similar to a parking meter whereby you top up credits to ensure that your parking does not expire, in this case, you keep renewing the endpoint expiry date time to keep it running.
+The Amazon SageMaker Endpoint manager solution will allow you to expose your Amazon SageMaker foundation models through the Amazon API Gateway with a dynamodb authorizer using CDK. Amazon SageMaker Endpoint manager also features a mechanism to manage your real-time endpoint which will automatically start and stop your Amazon SageMaker endpoint through an expiry datetime configuration for each endpoint. Similar to a parking meter whereby you top up credits to ensure that your parking does not expire, in this case, you keep renewing the endpoint expiry date time to keep it running.
 
-This solution was designed to solve a recurring problem with users leaving their Amazon SageMaker endpoint on and forgetting to delete them after usage. The approach taken solve this in the first iteration is to enforce users to renew their endpoint expiry times based on when they need it. By doing so, it raises the awareness of the cost of the endpoint (particularly for LLM endpoint) and also ensure that the user is intentional in how much more time they need to use the endpoint for testing.
+This solution was designed to solve a recurring problem with users leaving their Amazon SageMaker endpoint on and forgetting to delete them after usage. The approach taken to solve this in the first iteration is to enforce users to renew their endpoint expiry times based on how much time need it up for. By doing so, it raises the awareness of the cost of the endpoint (particularly for LLM endpoint) and also ensure that the user is intentional as to how time they actually need to use the endpoint for testing and development.
+
+---
+## What's New
+
+20/07/2023
+- Added support for multiple endpoints and apis in a configuration file - `config/configs.json` file.
+- Consolidated realtime and async stack to simplify deployment.
+
+---
 
 ## Table of contents
-- [Deploying a auto start/stop Amazon SageMaker Foundation Model endpoint backed by a API Gateway/Lambda](#deploying-a-auto-startstop-amazon-sagemaker-foundation-model-endpoint-backed-by-a-api-gatewaylambda)
+- [Amazon SageMaker Endpoint Manager](#amazon-sagemaker-endpoint-manager)
+  - [What's New](#whats-new)
   - [Table of contents](#table-of-contents)
   - [Demo Overview](#demo-overview)
   - [How to deploy the stack](#how-to-deploy-the-stack)
-  - [Deploying a real-time endpoint](#deploying-a-real-time-endpoint)
   - [Real-time Endpoint Management Functions - Querying your real-time endpoint expiry time](#real-time-endpoint-management-functions---querying-your-real-time-endpoint-expiry-time)
   - [Real-time Endpoint Management Functions - Extending your real-time endpoint expiry time](#real-time-endpoint-management-functions---extending-your-real-time-endpoint-expiry-time)
   - [Real-time Endpoint Management Functions - Adding a new real-time endpoint](#real-time-endpoint-management-functions---adding-a-new-real-time-endpoint)
   - [Interacting with your real-time endpoint via API](#interacting-with-your-real-time-endpoint-via-api)
-  - [Deploying an async endpoint (WIP)](#deploying-an-async-endpoint-wip)
   - [Example Notebook](#example-notebook)
-  - [The notebook will show you how to manage your endpoint, interact with your SageMaker endpoint API And how to use Langchain with APIGateway.](#the-notebook-will-show-you-how-to-manage-your-endpoint-interact-with-your-sagemaker-endpoint-api-and-how-to-use-langchain-with-apigateway)
+  - [Endpoint Manager Configurations](#endpoint-manager-configurations)
+    - [**Jumpstart model**](#jumpstart-model)
+    - [**Schedule Configuration**](#schedule-configuration)
+    - [**Integration Configuration**](#integration-configuration)
+    - [**Integration Properties**](#integration-properties)
   - [How does the endpoint manager work?](#how-does-the-endpoint-manager-work)
   - [To Do](#to-do)
   - [References](#references)
@@ -65,55 +77,78 @@ This solution was designed to solve a recurring problem with users leaving their
 
 5. Define your configuration
 
-    In this demo, you have the option to either deploy a FALCON 40B or FLAN-T5 model. To do so, open the `app.py` and set/uncomment the following configurations:
+    Setup your Amazon SageMaker Endpoint Manager and configure the models that you'd like to deploy by opening the [`config/config.json`](config/configs.json) file with a text editor. Configure the project settings such as your `project_prefix`, `region_name` - region to deploy the stack and `ddb_auth_table_name`. For more information on the configuration, refer to the [Endpoint manager Configuration section](#endpoint-manager-configurations).
 
-    For Falcon 40B
+    Next define the jumpstart models you'd like to deploy. For more information on the jumpstart model configuration, refer to [jumpstart model configuration section](#example-jumpstart-model-configuration). Below, you can find an example of how to deploy a real-time falcon40b and flan jumpstart model. You will also find additional examples in the [`config/example-configs.json`](config/example-configs.json) file.
+    
+    ### Example Jumpstart model configuration
+
+    **Falcon 40B**
     ```
-    model_name="Falcon40B"
-    MODEL_ID = "huggingface-llm-falcon-40b-instruct-bf16"
-    INFERENCE_INSTANCE_TYPE = "ml.g5.12xlarge"
-    LAMBDA_SRC = "api/falcon"
-    API_RESOURCE ="falcon"
+        {
+            "name" : "Falcon40B",
+            "model_id" : "huggingface-llm-falcon-40b-instruct-bf16",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": {
+                "initial_provision_minutes": 90
+            },
+            "integration": {
+                "type": "lambda",
+                "properties": {
+                    "lambda_src": "functions/falcon",
+                    "api_resource_name": "falcon"
+                }
+            }
+        }
+    ```
+    FLAN T5
+    ```
+    {
+            "name" : "FlanT5",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": {
+                "initial_provision_minutes": 0
+            },
+            "integration": {
+                "type": "lambda",
+                "properties": {
+                    "lambda_src": "functions/flan",
+                    "api_resource_name": "flan"
+                }
+            }
+        }
     ```
 
-    For FLAN
-    ```
-    model_name="FlanT5"
-    MODEL_ID = "huggingface-text2text-flan-t5-xxl"
-    INFERENCE_INSTANCE_TYPE = "ml.g5.12xlarge" 
-    LAMBDA_SRC = "api/flan"
-    API_RESOURCE ="flan"
-    ```
+6. Deploy the API Gateway
 
-6. Deploying your endpoint
-
-    If you want to deploy a real-time endpoint, refer to [Deploying a real-time endpoint](#deploying-a-real-time-endpoint), if not refer to [Deploying an async endpoint](#deploying-an-async-endpoint)
-
----
-## Deploying a real-time endpoint
-
- 1. In the previous step, we defined the model we want to use. Now we will register the model and create the endpoint configurations in Amazon SageMaker. By default, the stack assumes that we will be utilising the endpoint manager to provision our real-time endpoint. This is done by setting `deploy_enable=False`.
+    First up, we will deploy the API Gateway which will provide us with an internet facing API to interact with our Amazon SageMaker Endpoint and manage our Amazon SageMaker endpoint. The API Gateway is backed by a basic lambda authorizer with the authorization tokens stored in an Amazon DynamoDB database.
 
      ```
-     $ cdk deploy ModelMeteredStack
+     $ cdk deploy APIStack
      ```
 
- 2. Deploy the endpoint manager stack
+7. Deploy the endpoint manager stack
 
-     Deploy the lambda that will be responsible for the automatic creation and deletion of your Amazon SageMaker endpoint
+     Deploy the lambda that will be responsible for the automatic creation and deletion of your Amazon SageMaker real-time endpoints.
+
+     **Note:** If you are not using real-time endpoints, you do not need to deploy this start.
+
      ```
      $ cdk deploy EndpointManagerStack
      ```
-     
- 3. Deploy serverless API
 
-     Next we will deploy the passthrough lambda which will invoke the Amazon SageMaker endpoint and the API Gateway which will provide us with an internet facing API to interact with our Amazon SageMaker Endpoint and manage our Amazon SageMaker endpoint. The API Gateway is backed by a basic lambda authorizer with the authorization tokens stored in an Amazon DynamoDB database.
+7. Deploying your endpoints
 
+    Finally, we will deploy our Amazon SageMaker endpoints and passthrough lambda (if configured). Note, this stack will deploy all models in the list of jumpstart models.
+
+    ```
+     $ cdk deploy FoundationModelStack
      ```
-     $ cdk deploy ModelLambdaStack && cdk deploy APIStack
-     ```
 
- 4.  Setup your auth
+ 8.  Setup your auth
 
      In your AWS account, you will find a Dynamodb table `auth` which stores a token (or pass code) which you will use to as an authorization token to access the APIs. Create an item in the `auth` table with an attribute `token` and set the value to your pass code which you will use when calling the API.
 
@@ -294,19 +329,79 @@ Expected response
 ```
 
 ---
-
-## Deploying an async endpoint (WIP)
-
-If you'd like to deploy an asynchronous foundational model endpoint, follow this step. (Note this does not have use the endpoint manager feature for auto start/stop)
-```
-cdk deploy ModelAsyncStack
-```
----
 ## Example Notebook
 
 You can also interact with the API gateway via notebook. To do so, clone this repository or copy `00-api_gateway_managed_endpoint.ipynb` to your notebook environment (i.e. Amazon SageMaker Studio) and run through the instructions in the notebook.
 
 The notebook will show you how to manage your endpoint, interact with your SageMaker endpoint API And how to use Langchain with APIGateway.
+
+---
+
+## Endpoint Manager Configurations
+Endpoint manager configurations:
+- `project_prefix`
+  - Description: Project prefix name to use for all resources
+  - Type: String
+- `region_name`
+  - Description: AWS region to deploy the CDK solution and endpoint
+  - Type: String
+  - Example values: `us-east-1` | `us-west-1`
+- `ddb_auth_table_name`
+  - Description: Name of the dynamodb table to store your auth token for your API Gateway
+  - Type: String
+- `jumpstart_models`
+  - Description: List of jumpstart models configurations 
+  - Type: Array of [Jumpstart model](#jumpstart-model)
+
+### **Jumpstart model**
+Jumpstart model configurations
+  - `name`
+    - Description: Name of model
+    - Type: String
+  - `model_id`
+    - Description: Jumpstart model ID (A list of model id can be found [here](https://sagemaker.readthedocs.io/en/stable/doc_utils/pretrainedmodels.html))
+    - Type: String
+  - `inference_instance_type`
+    - Description: Size of the instance type to use
+    - Type: String
+  - `inference_type`
+    - Description: Type of inference endpoint to be deployed - Real-time or asynchronous
+    - Type: String
+    - Valid Options: `realtime` | `async`
+  - `schedule`
+    - Description: Schedule configuration for the endpoint
+    - Type: [Schedule Configuration](#schedule-config) object
+  - `integration`
+    - Description: Endpoint integration configurations.
+    - Type: [Integration](#integration-configuration) object.
+
+
+### **Schedule Configuration**
+SageMaker Endpoint Schedule configuration (Currently supports expiring endpoints).
+- `initial_provision_minutes`
+    - Description: Initial time the endpoint will be provisioned for when the CDK stack is deployed in minutes.
+    - Type: Integer
+
+
+### **Integration Configuration**
+Endpoint integration configurations
+- `type`
+    - Description: Indicates the type of API Gateway integration with the endpoint
+    - Type: String
+    - Valid Options: `lambda`
+- `properties`
+    - Description: Integration properties
+    - Type: [Integration Properties](#integration-properties)
+
+### **Integration Properties**
+Integration specific configurations
+- `lambda_src`
+    - Description: Path to the lambda handler for the API Gateway/Endpoint integration
+    - Type: String
+- `api_resource_name`
+    - Description: API gateway resource name. For example, setting it to `falcon` will result in the API gateway path as `https://<api_gateway_id>.execute-api.us-east-1.amazonaws.com/prod/falcon`
+    - Type: String
+
 ---
 ## How does the endpoint manager work?
 
@@ -328,7 +423,7 @@ The notebook will show you how to manage your endpoint, interact with your SageM
 - [ ] Add UI to manage endpoint expiry
 - [ ] Automatic shutdown of endpoint based on endpoint activity (i.e. <X% of usage)
 - [ ] Add configuration to use pre-defined dynamodb auth table or create new dynamodb table.
-- [ ] Extend async solution
+- [ ] Extend async solution with lambda
 
 ## References
 

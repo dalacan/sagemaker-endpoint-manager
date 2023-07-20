@@ -1,0 +1,45 @@
+{
+    "project_prefix": "demo",
+    "region_name": "us-east-1",
+    "ddb_auth_table_name": "AuthTable",
+    "jumpstart_models" :[
+        {
+            "name" : "Falcon40B",
+            "model_id" : "huggingface-llm-falcon-40b-instruct-bf16",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": {
+                "initial_provision_minutes": 90
+            },
+            "integration": {
+                "type": "lambda",
+                "properties": {
+                    "lambda_src": "functions/falcon",
+                    "api_resource_name": "falcon"
+                }
+            }
+        },
+        {
+            "name" : "FlanT5",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": {
+                "initial_provision_minutes": 0
+            },
+            "integration": {
+                "type": "lambda",
+                "properties": {
+                    "lambda_src": "functions/flan",
+                    "api_resource_name": "flan"
+                }
+            }
+        },
+        {
+            "name" : "FlanT5Async",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.8xlarge",
+            "inference_type": "async"
+        }
+    ]
+}

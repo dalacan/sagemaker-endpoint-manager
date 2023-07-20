@@ -6,7 +6,7 @@ import json
 
 sagemaker_client = boto3.client('sagemaker')
 ssm_client = boto3.client("ssm")
-SSM_ENDPOINT_EXPIRY_PARAMETER = os.environ['SSM_ENDPOINT_EXPIRY_PARAMETER']
+# SSM_ENDPOINT_EXPIRY_PARAMETER = os.environ['SSM_ENDPOINT_EXPIRY_PARAMETER']
 
 def start_stop_endpoint(expiry_parameter_values):
     expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')

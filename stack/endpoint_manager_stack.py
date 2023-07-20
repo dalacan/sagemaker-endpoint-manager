@@ -5,31 +5,23 @@ from aws_cdk import (
     aws_ssm as ssm,
     aws_lambda as _lambda,
     aws_events as events,
-    aws_events_targets as targets
+    aws_events_targets as targets,
+    aws_apigateway as apigateway
 )
 
 from constructs import Construct
 
-from datetime import datetime, timedelta
-
-import json
-
 class EndpointManagerStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, project_prefix, model_name, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, api_stack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Create endpoint manager lambdas
-        endpoint_name = f"{project_prefix}-{model_name}-Endpoint"
-
         start_endpoint_handler = _lambda.Function(self, f"StartEndpointHandler",
                 runtime=_lambda.Runtime.PYTHON_3_9,
-                code=_lambda.Code.from_asset("api/start_stop_endpoint"),
+                code=_lambda.Code.from_asset("functions/start_stop_endpoint"),
                 handler="app.handler",
-                timeout=Duration.seconds(30),
-                environment={
-                    "SSM_ENDPOINT_EXPIRY_PARAMETER": f"/sagemaker/endpoint/expiry/{endpoint_name}"
-                })
+                timeout=Duration.seconds(30))
 
         # Add policy to lambda to create endpoint
         start_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
@@ -56,20 +48,25 @@ class EndpointManagerStack(Stack):
                                            schedule=events.Schedule.rate(Duration.minutes(1)),
                                            targets=[targets.LambdaFunction(handler=start_endpoint_handler)])
         
-        self.update_expiry_handler = _lambda.Function(self, f"UpdateExpiryHandler",
+        update_expiry_handler = _lambda.Function(self, f"UpdateExpiryHandler",
                 runtime=_lambda.Runtime.PYTHON_3_9,
-                code=_lambda.Code.from_asset("api/update_expiry"),
+                code=_lambda.Code.from_asset("functions/update_expiry"),
                 handler="app.handler",
-                timeout=Duration.seconds(30),
-                environment={
-                    "SSM_ENDPOINT_EXPIRY_PARAMETER": f"/sagemaker/endpoint/expiry/{endpoint_name}"
-                })
+                timeout=Duration.seconds(30))
 
         # Add SSM read/write policy
-        self.update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
+        update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
             actions=["ssm:DescribeParameters", "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:PutParameter", "ssm:GetParametersByPath"],
             resources=[
                 ssm_arn
             ],
         ))
+
+        # Add lambda to api gateway
+        post_update_expiry_integration = apigateway.LambdaIntegration(update_expiry_handler,
+                                                                  request_templates={"application/json": '{ "statusCode": "200" }'})
+        # Add lambda to api
+        resource = api_stack.api.root.add_resource('endpoint-expiry')
+        resource.add_method("POST", post_update_expiry_integration, authorizer=api_stack.api_authorizer)
+        resource.add_method("GET", post_update_expiry_integration, authorizer=api_stack.api_authorizer)

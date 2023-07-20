@@ -1,23 +1,31 @@
 from aws_cdk import (
     Stack,
+    Duration,
     aws_iam as iam,
     aws_ssm as ssm,
+    aws_lambda as _lambda,
+    aws_apigateway as apigateway,
     aws_sns as sns,
     aws_s3 as s3
 )
 
 from constructs import Construct
-
 from construct.sagemaker_endpoint_construct import SageMakerEndpointConstruct
 from construct.sagemaker_async_endpoint_construct import SageMakerAsyncEndpointConstruct
 
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
+from stack.util import merge_env
+
+from utils.sagemaker_uri import *
+from utils.sagemaker_env import *
 
 class FoundationModelStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, project_prefix, model_name, model_info, async_inference, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, configs, api_stack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Create policies for model
         role = iam.Role(self, "Gen-AI-SageMaker-Policy", assumed_by=iam.ServicePrincipal("sagemaker.amazonaws.com"))
         role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AmazonS3FullAccess"))
         
@@ -60,102 +68,182 @@ class FoundationModelStack(Stack):
         role.attach_inline_policy(logs_policy)
         role.attach_inline_policy(ecr_policy)
 
-        # Append datetime to model name
-        now = datetime.utcnow()
-        model_suffix = now.strftime("%d-%m-%Y-%H-%M-%S-%f")[:-3]
-        
-        if async_inference:
-            # Create sns success and error topic
-            success_topic = sns.Topic(self, f"{model_name}-SuccessTopic",
-                                        display_name=f"{model_name}-SuccessTopic")
+        # Deploy jumpstart models
+        for model in configs.get("jumpstart_models", []):
+            if model["inference_type"] == "realtime":
+                # Create real-time endpoint
+                
+                # Get model info
+                model_info = get_sagemaker_uris(model_id=model["model_id"],
+                                            instance_type=model["inference_instance_type"],
+                                            region_name=configs["region_name"])
+
+                # Get model default environment parameters
+                model_env = sagemaker_env(model_id=model["model_id"],
+                                        region=configs["region_name"],
+                                        model_version="*")
+
+
+                # environment = {
+                #                     "MODEL_CACHE_ROOT": "/opt/ml/model",
+                #                     "SAGEMAKER_ENV": "1",
+                #                     "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
+                #                     "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
+                #                     "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
+                #                     "SAGEMAKER_PROGRAM": "inference.py",
+                #                     "SAGEMAKER_REGION": model_info["region_name"],
+                #                     "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+                #                 }
+                environment = {
+                                    "MODEL_CACHE_ROOT": "/opt/ml/model",
+                                    "SAGEMAKER_ENV": "1",
+                                    "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
+                                    "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
+                                    "SAGEMAKER_PROGRAM": "inference.py",
+                                    "SAGEMAKER_REGION": model_info["region_name"],
+                                    "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+                                }
+
+                environment = merge_env(environment, model_env)
+                
+                endpoint = SageMakerEndpointConstruct(self, f'FoundationModelEndpoint-{model["name"]}',
+                                            project_prefix = configs["project_prefix"],
+                                            
+                                            role_arn= role.role_arn,
+
+                                            model_name = model["name"],
+                                            model_bucket_name = model_info["model_bucket_name"],
+                                            model_bucket_key = model_info["model_bucket_key"],
+                                            model_docker_image = model_info["model_docker_image"],
+
+                                            variant_name = "AllTraffic",
+                                            variant_weight = 1,
+                                            instance_count = 1,
+                                            instance_type = model_info["instance_type"],
+
+                                            environment = environment,
+                                            deploy_enable = False
+                )
+                
+                endpoint.node.add_dependency(role)
+                endpoint.node.add_dependency(sts_policy)
+                endpoint.node.add_dependency(logs_policy)
+                endpoint.node.add_dependency(ecr_policy)
+
+                endpoint_name = f'{configs["project_prefix"]}-{model["name"]}-Endpoint'
+
+                # Set endpoint expiry
+                now = datetime.utcnow()
+                expiry = now + timedelta(minutes=model["schedule"]["initial_provision_minutes"])
+
+                expiry_ssm_value = {
+                    "expiry": expiry.strftime("%d-%m-%Y-%H-%M-%S"),
+                    "endpoint_name": endpoint_name,
+                    "endpoint_config_name": endpoint.config.attr_endpoint_config_name
+                }
+
+                # Create default SSM parameter to manage endpoint
+                expiry_ssm = ssm.StringParameter(self, 
+                                                f"{endpoint_name}-expiry", 
+                                                parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", 
+                                                string_value=json.dumps(expiry_ssm_value))
+                
+                # Check integration type
+                if model["integration"]["type"] == "lambda":
+                    # Add lambda/api integration
+                    resource_name = model["integration"]["properties"]["api_resource_name"]
+                    app_handler = _lambda.Function(self, f"{resource_name}Handler",
+                    runtime=_lambda.Runtime.PYTHON_3_9,
+                    code=_lambda.Code.from_asset(model["integration"]["properties"]["lambda_src"]),
+                    handler="app.handler",
+                    timeout=Duration.seconds(180),
+                    environment={
+                        "ENDPOINT_NAME": endpoint_name,
+                    })
             
-            error_topic = sns.Topic(self, f"{model_name}-ErrorTopic",
-                                        display_name=f"{model_name}-ErrorTopic")
-            
-            sns_policy = iam.Policy(self, "sm-deploy-policy-sns",
-                                        statements=[iam.PolicyStatement(
-                                            effect=iam.Effect.ALLOW,
-                                            actions=["sns:Publish"],
-                                            resources=[success_topic.topic_arn, error_topic.topic_arn]
-                                        )]
-            )
+                    endpoint_arn = f'arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}'
 
-            s3_async = s3.Bucket(self, f"{model_name}-S3Async")
+                    # Add sagemaker invoke permissions    
+                    app_handler.add_to_role_policy(iam.PolicyStatement(
+                        effect=iam.Effect.ALLOW,
+                        actions=["sagemaker:InvokeEndpoint"],
+                        resources=[endpoint_arn],
+                    ))
 
-            s3_policy = iam.Policy(self, "sm-deploy-policy-s3",
-                                        statements=[iam.PolicyStatement(
-                                            effect=iam.Effect.ALLOW,
-                                            actions=["s3:*"],
-                                            resources=[s3_async.bucket_arn]
-                                        )]
-            )
+                    post_model_integration = apigateway.LambdaIntegration(app_handler,
+                                                                            request_templates={"application/json": '{ "statusCode": "200" }'})
+                    # Add lambda to api
+                    resource = api_stack.api.root.add_resource(resource_name)
+                    resource.add_method("POST", post_model_integration, authorizer=api_stack.api_authorizer)
+            elif model["inference_type"] == "async":
+                # Create async endpoint
 
-            role.attach_inline_policy(sns_policy)
-            role.attach_inline_policy(s3_policy)
+                # Create sns success and error topic
+                success_topic = sns.Topic(self, f'{model["name"]}-SuccessTopic',
+                                            display_name=f'{model["name"]}-SuccessTopic')
+                
+                error_topic = sns.Topic(self, f'{model["name"]}-ErrorTopic',
+                                            display_name=f'{model["name"]}-ErrorTopic')
+                
+                sns_policy = iam.Policy(self, "sm-deploy-policy-sns",
+                                            statements=[iam.PolicyStatement(
+                                                effect=iam.Effect.ALLOW,
+                                                actions=["sns:Publish"],
+                                                resources=[success_topic.topic_arn, error_topic.topic_arn]
+                                            )]
+                )
 
-            self.endpoint = SageMakerAsyncEndpointConstruct(self, "FoundationModelEndpoint",
-                            project_prefix = project_prefix,
-                            
-                            role_arn= role.role_arn,
+                # Create async output bucket
+                s3_async = s3.Bucket(self, f'{model["name"]}-S3Async')
 
-                            model_name = model_name,
-                            model_bucket_name = model_info["model_bucket_name"],
-                            model_bucket_key = model_info["model_bucket_key"],
-                            model_docker_image = model_info["model_docker_image"],
+                s3_policy = iam.Policy(self, "sm-deploy-policy-s3",
+                                            statements=[iam.PolicyStatement(
+                                                effect=iam.Effect.ALLOW,
+                                                actions=["s3:*"],
+                                                resources=[s3_async.bucket_arn]
+                                            )]
+                )
 
-                            variant_name = "AllTraffic",
-                            variant_weight = 1,
-                            instance_count = 1,
-                            instance_type = model_info["instance_type"],
+                role.attach_inline_policy(sns_policy)
+                role.attach_inline_policy(s3_policy)
 
-                            environment = {
-                                "MODEL_CACHE_ROOT": "/opt/ml/model",
-                                "SAGEMAKER_ENV": "1",
-                                "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
-                                "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
-                                "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
-                                "SAGEMAKER_PROGRAM": "inference.py",
-                                "SAGEMAKER_REGION": model_info["region_name"],
-                                "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
-                            },
-                            model_suffix = model_suffix,
-                            deploy_enable = True,
+                environment = {
+                                    "MODEL_CACHE_ROOT": "/opt/ml/model",
+                                    "SAGEMAKER_ENV": "1",
+                                    "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
+                                    "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
+                                    "SAGEMAKER_PROGRAM": "inference.py",
+                                    "SAGEMAKER_REGION": model_info["region_name"],
+                                    "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
+                                }
 
-                            success_topic=success_topic.topic_arn,
-                            error_topic=error_topic.topic_arn,
-                            s3_async_bucket=s3_async.bucket_name,
-            )
-        else:
-            self.endpoint = SageMakerEndpointConstruct(self, "FoundationModelEndpoint",
-                                        project_prefix = project_prefix,
-                                        
-                                        role_arn= role.role_arn,
+                environment = merge_env(environment, model_env)
 
-                                        model_name = model_name,
-                                        model_bucket_name = model_info["model_bucket_name"],
-                                        model_bucket_key = model_info["model_bucket_key"],
-                                        model_docker_image = model_info["model_docker_image"],
+                endpoint = SageMakerAsyncEndpointConstruct(self, "FoundationModelEndpoint",
+                                project_prefix = configs["project_prefix"],
+                                
+                                role_arn= role.role_arn,
 
-                                        variant_name = "AllTraffic",
-                                        variant_weight = 1,
-                                        instance_count = 1,
-                                        instance_type = model_info["instance_type"],
+                                model_name = model["name"],
+                                model_bucket_name = model_info["model_bucket_name"],
+                                model_bucket_key = model_info["model_bucket_key"],
+                                model_docker_image = model_info["model_docker_image"],
 
-                                        environment = {
-                                            "MODEL_CACHE_ROOT": "/opt/ml/model",
-                                            "SAGEMAKER_ENV": "1",
-                                            "SAGEMAKER_MODEL_SERVER_TIMEOUT": "3600",
-                                            "SAGEMAKER_MODEL_SERVER_WORKERS": "1",
-                                            "SAGEMAKER_CONTAINER_LOG_LEVEL": "20",
-                                            "SAGEMAKER_PROGRAM": "inference.py",
-                                            "SAGEMAKER_REGION": model_info["region_name"],
-                                            "SAGEMAKER_SUBMIT_DIRECTORY": "/opt/ml/model/code",
-                                        },
-                                        model_suffix = model_suffix,
-                                        deploy_enable = True
-            )
-        self.endpoint.node.add_dependency(role)
-        self.endpoint.node.add_dependency(sts_policy)
-        self.endpoint.node.add_dependency(logs_policy)
-        self.endpoint.node.add_dependency(ecr_policy)
+                                variant_name = "AllTraffic",
+                                variant_weight = 1,
+                                instance_count = 1,
+                                instance_type = model_info["instance_type"],
+
+                                environment = environment,
+                                deploy_enable = True,
+
+                                success_topic=success_topic.topic_arn,
+                                error_topic=error_topic.topic_arn,
+                                s3_async_bucket=s3_async.bucket_name,
+                )
+                endpoint.node.add_dependency(role)
+                endpoint.node.add_dependency(sts_policy)
+                endpoint.node.add_dependency(logs_policy)
+                endpoint.node.add_dependency(ecr_policy)
+                                                                             
         

@@ -156,7 +156,7 @@ This solution was designed to solve a recurring problem with users leaving their
     Finally, we will deploy our Amazon SageMaker endpoints and passthrough lambda (if configured). Note, this stack will deploy all models in the list of jumpstart models.
 
     ```
-     $ cdk deploy FoundationModelStack
+     $ cdk deploy ModelMeteredStack
      ```
 
  8.  Setup your auth

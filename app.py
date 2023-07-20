@@ -25,7 +25,7 @@ api_stack = APIStack(app, "APIStack",
 )
 
 # Deploy foundation models configuration and lambda
-fm_stack = FoundationModelStack(app, "FoundationModelStack", 
+fm_stack = FoundationModelStack(app, "ModelMeteredStack", 
                                 env=environment,
                                 configs=configs,
                                 api_stack=api_stack

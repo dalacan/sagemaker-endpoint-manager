@@ -25,7 +25,7 @@
             "inference_instance_type" : "ml.g5.12xlarge",
             "inference_type": "realtime",
             "schedule": {
-                "initial_provision_minutes": 0
+                "initial_provision_minutes": 90
             },
             "integration": {
                 "type": "lambda",

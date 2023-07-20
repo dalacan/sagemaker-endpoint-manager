@@ -83,7 +83,7 @@ This solution was designed to solve a recurring problem with users leaving their
     
     ### Example Jumpstart model configuration
 
-    **Falcon 40B**
+    **Falcon 40B - Realtime Endpoint configuration**
     ```
         {
             "name" : "Falcon40B",
@@ -102,7 +102,8 @@ This solution was designed to solve a recurring problem with users leaving their
             }
         }
     ```
-    FLAN T5
+
+    **FLAN T5 - Realtime Endpoint configuration**
     ```
     {
             "name" : "FlanT5",
@@ -120,6 +121,16 @@ This solution was designed to solve a recurring problem with users leaving their
                 }
             }
         }
+    ```
+
+    **FLAT T5 - Asynchronous Endpoint configuration**
+    ```
+    {
+            "name" : "FlanT5Async",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.8xlarge",
+            "inference_type": "async"
+    }
     ```
 
 6. Deploy the API Gateway

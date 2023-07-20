@@ -7,15 +7,11 @@ ENDPOINT_NAME = os.environ['ENDPOINT_NAME']
 runtime= boto3.client('runtime.sagemaker')
 
 def handler(event, context):
-    print(event)
-
     payload = {'text_inputs':'write a sentence to suggest providing a custom input for the model inference', 'max_length': 50, 'temperature': 0.0, 'seed': 321}
     if event['body'] is not None :
         body = event['body']
     else:
         body = json.dumps(payload)
-    
-    print(body)
     
     response = runtime.invoke_endpoint(
         EndpointName=ENDPOINT_NAME,

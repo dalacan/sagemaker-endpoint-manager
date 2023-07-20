@@ -57,21 +57,15 @@ def handler(event, context):
     policy.stage = apiGatewayArnTmp[1]
 
     # Check here
-    print(event['headers'])
     token = event['headers']['Authorization']
-    print(f"Looking up token {token}")
 
     try:
-        print("Checking dynamodb")
         auth_table = dynamodb.Table(table)
         response = auth_table.get_item(
             Key={"token": token}
             )
-        print("Response:")
-        print(response)
     except Exception as e:
         print("Exception")
-        print(e)
         policy.denyAllMethods()
     else:
         if 'Item' in response:
@@ -85,11 +79,6 @@ def handler(event, context):
     # Finally, build the policy
     authResponse = policy.build()
  
-    # authResponse['context'] = context
-
-    print("authResponse")
-    print(authResponse)
-    
     # return authResponse
     return json.loads(json.dumps(authResponse, default=str))
 

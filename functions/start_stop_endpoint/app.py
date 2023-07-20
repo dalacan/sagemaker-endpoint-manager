@@ -1,12 +1,10 @@
 import boto3
 import botocore
-import os
 from datetime import datetime
 import json
 
 sagemaker_client = boto3.client('sagemaker')
 ssm_client = boto3.client("ssm")
-# SSM_ENDPOINT_EXPIRY_PARAMETER = os.environ['SSM_ENDPOINT_EXPIRY_PARAMETER']
 
 def start_stop_endpoint(expiry_parameter_values):
     expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')
@@ -14,9 +12,8 @@ def start_stop_endpoint(expiry_parameter_values):
     
     # Expired, delete endpoint
     if expiry < now:
-        print("Endpoint has expired")
         # Delete endpoint
-        print("Deleting endpoint")
+        print("Endpoint has expired, deleting endpoint")
         try:
             sagemaker_client.delete_endpoint(EndpointName=expiry_parameter_values['endpoint_name'])
         except botocore.exceptions.ClientError as error:
@@ -54,11 +51,6 @@ def create_endpoint(endpoint_name, endpoint_config_name):
                                         EndpointConfigName=endpoint_config_name)
 
 def handler(event, context):
-
-    # Get expiry
-    # expiry_parameter = ssm_client.get_parameter(Name=SSM_ENDPOINT_EXPIRY_PARAMETER)
-    # expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
-
     # Get a list of endpoint expiry parameters
     response = ssm_client.get_parameters_by_path(
         Path="/sagemaker/endpoint/expiry/",
@@ -79,8 +71,3 @@ def handler(event, context):
         # endpoint_name = parameter['Name'].split("/")[-1]
         parameter_values = json.loads(parameter['Value'])
         start_stop_endpoint(parameter_values) 
-
-    # start_stop_endpoint(expiry_parameter_values)
-
-
-    

@@ -5,9 +5,7 @@ import json
 
 from datetime import datetime, timedelta
 
-# grab environment variables
 ssm_client = boto3.client("ssm")
-# SSM_ENDPOINT_EXPIRY_PARAMETER = os.environ['SSM_ENDPOINT_EXPIRY_PARAMETER']
 
 def get_expiry(expiry_parameter_values):
     expiry = datetime.strptime(expiry_parameter_values['expiry'], '%d-%m-%Y-%H-%M-%S')

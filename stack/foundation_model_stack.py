@@ -148,10 +148,12 @@ class FoundationModelStack(Stack):
                                                 parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", 
                                                 string_value=json.dumps(expiry_ssm_value))
                 
+                endpoint_arn = f'arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}'
+                resource_name = model["integration"]["properties"]["api_resource_name"]
+                
                 # Check integration type
                 if model["integration"]["type"] == "lambda":
                     # Add lambda/api integration
-                    resource_name = model["integration"]["properties"]["api_resource_name"]
                     app_handler = _lambda.Function(self, f"{resource_name}Handler",
                     runtime=_lambda.Runtime.PYTHON_3_9,
                     code=_lambda.Code.from_asset(model["integration"]["properties"]["lambda_src"]),
@@ -161,8 +163,6 @@ class FoundationModelStack(Stack):
                         "ENDPOINT_NAME": endpoint_name,
                     })
             
-                    endpoint_arn = f'arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}'
-
                     # Add sagemaker invoke permissions    
                     app_handler.add_to_role_policy(iam.PolicyStatement(
                         effect=iam.Effect.ALLOW,
@@ -175,6 +175,76 @@ class FoundationModelStack(Stack):
                     # Add lambda to api
                     resource = api_stack.api.root.add_resource(resource_name)
                     resource.add_method("POST", post_model_integration, authorizer=api_stack.api_authorizer)
+                elif model["integration"]["type"] == "api":
+                    # Add permission to invoke endpoint
+                    api_stack.api_gateway_role.add_to_policy(iam.PolicyStatement(
+                                                        effect=iam.Effect.ALLOW,
+                                                        actions=["sagemaker:InvokeEndpoint"],
+                                                        resources=[endpoint_arn],
+                                                    )
+                                                )
+                    
+                    # Add api integration/aws integration
+                    resource = api_stack.api.root.add_resource(resource_name)
+                    post_model_integration = apigateway.AwsIntegration(
+                                                        service="runtime.sagemaker",
+                                                        integration_http_method="POST",
+                                                        path=f"endpoints/{endpoint_name}/invocations",
+                                                        options=apigateway.IntegrationOptions(
+                                                            request_parameters={
+                                                                "integration.request.header.Content-Type": "method.request.header.Content-Type",
+                                                                "integration.request.header.Accept": "method.request.header.Accept",
+                                                            },
+                                                            credentials_role=api_stack.api_gateway_role,
+                                                            integration_responses=[
+                                                                apigateway.IntegrationResponse(
+                                                                    status_code="200",
+                                                                    response_templates={
+                                                                        "application/json": "$input.json('$')"
+                                                                    },
+                                                                ),
+                                                                apigateway.IntegrationResponse(
+                                                                    status_code="400",
+                                                                    selection_pattern="4\d{2}",
+                                                                    response_templates={
+                                                                        "application/json": '{ "error": $input.path("$.OriginalMessage") }'
+                                                                    },
+                                                                ),
+                                                                apigateway.IntegrationResponse(
+                                                                    status_code="500",
+                                                                    selection_pattern="5\d{2}",
+                                                                    response_templates={
+                                                                        "application/json": '{ "error": $input.path("$.OriginalMessage") }'
+                                                                    },
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    )
+                    resource.add_method("POST", 
+                                        post_model_integration, 
+                                        authorizer=api_stack.api_authorizer,
+                                        request_parameters={
+                                                                "method.request.header.Content-Type": True,
+                                                                "method.request.header.Accept": True,
+                                                            },
+                                                            method_responses=[
+                                                                apigateway.MethodResponse(status_code="200"),
+                                                                apigateway.MethodResponse(
+                                                                    status_code="400",
+                                                                    response_models={
+                                                                        "application/json": apigateway.Model.ERROR_MODEL
+                                                                    },
+                                                                ),
+                                                                apigateway.MethodResponse(
+                                                                    status_code="500",
+                                                                    response_models={
+                                                                        "application/json": apigateway.Model.ERROR_MODEL
+                                                                    },
+                                                                ),
+                                                            ]
+                                            )
+                    
+                    
             elif model["inference_type"] == "async":
                 # Create async endpoint
 

@@ -28,9 +28,8 @@
                 "initial_provision_minutes": 90
             },
             "integration": {
-                "type": "lambda",
+                "type": "api",
                 "properties": {
-                    "lambda_src": "functions/flan",
                     "api_resource_name": "flan"
                 }
             }

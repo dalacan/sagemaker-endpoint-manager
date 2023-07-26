@@ -4,7 +4,8 @@ from aws_cdk import (
     Stack,
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
-    aws_dynamodb as dynamodb
+    aws_dynamodb as dynamodb,
+    aws_iam as iam
 )
 
 from constructs import Construct
@@ -42,3 +43,8 @@ class APIStack(Stack):
                   rest_api_name="Foundation Model API Service",
                   description="This service serves all the foundation models.")
 
+        self.api_gateway_role = iam.Role(
+            self,
+            "ApiGatewayRole",
+            assumed_by=iam.ServicePrincipal("apigateway.amazonaws.com"),
+        )

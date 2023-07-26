@@ -10,6 +10,10 @@ This solution was designed to solve a recurring problem with users leaving their
 ---
 ## What's New
 
+27/07/2023
+- Added lambda exception handling
+- Added AWS Gateway direct AWS integration with Amazon SageMaker. To use AWS integration, set the `type` in the `integration` property to `api`.
+
 20/07/2023
 - Added support for multiple endpoints and apis in a configuration file - `config/configs.json` file.
 - Consolidated realtime and async stack to simplify deployment.
@@ -83,7 +87,7 @@ This solution was designed to solve a recurring problem with users leaving their
     
     ### Example Jumpstart model configuration
 
-    **Falcon 40B - Realtime Endpoint configuration**
+    **Falcon 40B - Realtime Endpoint configuration using apigateway/lambda integration**
     ```
         {
             "name" : "Falcon40B",
@@ -103,7 +107,7 @@ This solution was designed to solve a recurring problem with users leaving their
         }
     ```
 
-    **FLAN T5 - Realtime Endpoint configuration**
+    **FLAN T5 - Realtime Endpoint configuration using apigateway/lambda integration**
     ```
     {
             "name" : "FlanT5",
@@ -117,6 +121,25 @@ This solution was designed to solve a recurring problem with users leaving their
                 "type": "lambda",
                 "properties": {
                     "lambda_src": "functions/flan",
+                    "api_resource_name": "flan"
+                }
+            }
+        }
+    ```
+
+    **FLAN T5 - Realtime Endpoint configuration using API Gateway/AWS Integration**
+    ```
+    {
+            "name" : "FlanT5",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": {
+                "initial_provision_minutes": 0
+            },
+            "integration": {
+                "type": "api",
+                "properties": {
                     "api_resource_name": "flan"
                 }
             }
@@ -353,6 +376,7 @@ Endpoint manager configurations:
 - `project_prefix`
   - Description: Project prefix name to use for all resources
   - Type: String
+  - Required: Yes
 - `region_name`
   - Description: AWS region to deploy the CDK solution and endpoint
   - Type: String
@@ -369,15 +393,19 @@ Jumpstart model configurations
   - `name`
     - Description: Name of model
     - Type: String
+    - Required: Yes
   - `model_id`
     - Description: Jumpstart model ID (A list of model id can be found [here](https://sagemaker.readthedocs.io/en/stable/doc_utils/pretrainedmodels.html))
     - Type: String
+    - Required: Yes
   - `inference_instance_type`
     - Description: Size of the instance type to use
     - Type: String
+    - Required: Yes
   - `inference_type`
     - Description: Type of inference endpoint to be deployed - Real-time or asynchronous
     - Type: String
+    - Required: Yes
     - Valid Options: `realtime` | `async`
   - `schedule`
     - Description: Schedule configuration for the endpoint
@@ -397,9 +425,10 @@ SageMaker Endpoint Schedule configuration (Currently supports expiring endpoints
 ### **Integration Configuration**
 Endpoint integration configurations
 - `type`
-    - Description: Indicates the type of API Gateway integration with the endpoint
+    - Description: Indicates the type of API Gateway integration with the endpoint. If using lambda integration, ensure that you specify the `lambda_src` configuration in the integration properties.
     - Type: String
-    - Valid Options: `lambda`
+    - Required: Yes
+    - Valid Options: `lambda` | `api`
 - `properties`
     - Description: Integration properties
     - Type: [Integration Properties](#integration-properties)
@@ -407,11 +436,13 @@ Endpoint integration configurations
 ### **Integration Properties**
 Integration specific configurations
 - `lambda_src`
-    - Description: Path to the lambda handler for the API Gateway/Endpoint integration
+    - Description: Path to the lambda handler for the API Gateway/Endpoint integration.
     - Type: String
+    - Required: Yes for lambda integration type.
 - `api_resource_name`
     - Description: API gateway resource name. For example, setting it to `falcon` will result in the API gateway path as `https://<api_gateway_id>.execute-api.us-east-1.amazonaws.com/prod/falcon`
     - Type: String
+    - Required: Yes
 
 ---
 ## How does the endpoint manager work?
@@ -428,6 +459,8 @@ Integration specific configurations
 - [x] Add support for multiple endpoints
 - [x] Add support for managing existing endpoints
 - [x] Add support for adding new endpoints via API
+- [x] Improve lambda error handling
+- [x] Add API gateway/AWS integration
 - [ ] Add support for scheduled endpoints (i.e. M-F 9-5)
 - [ ] Add support for cognito users
 - [ ] Add support for expiry notifications

@@ -20,7 +20,7 @@
             }
         },
         {
-            "name" : "FlanT5",
+            "name" : "FlanT5lambda",
             "model_id" : "huggingface-text2text-flan-t5-xxl",
             "inference_instance_type" : "ml.g5.12xlarge",
             "inference_type": "realtime",
@@ -32,6 +32,21 @@
                 "properties": {
                     "lambda_src": "functions/flan",
                     "api_resource_name": "flan"
+                }
+            }
+        },
+        {
+            "name" : "FlanT5api",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": {
+                "initial_provision_minutes": 90
+            },
+            "integration": {
+                "type": "api",
+                "properties": {
+                    "api_resource_name": "flanapi"
                 }
             }
         },

@@ -42,16 +42,3 @@ class APIStack(Stack):
                   rest_api_name="Foundation Model API Service",
                   description="This service serves all the foundation models.")
 
-        # post_model_integration = apigateway.LambdaIntegration(lambda_stack.app_handler,
-        #                                                           request_templates={"application/json": '{ "statusCode": "200" }'})
-        # # Add lambda to api
-        # resource = api.root.add_resource(lambda_stack.resource_name)
-        # resource.add_method("POST", post_model_integration, authorizer=authorizer)
-
-        # # Update expiry api integration
-        # post_update_expiry_integration = apigateway.LambdaIntegration(endpoint_manager_stack.update_expiry_handler,
-        #                                                           request_templates={"application/json": '{ "statusCode": "200" }'})
-        # # Add lambda to api
-        # resource = api.root.add_resource('endpoint-expiry')
-        # resource.add_method("POST", post_update_expiry_integration, authorizer=authorizer)
-        # resource.add_method("GET", post_update_expiry_integration, authorizer=authorizer)

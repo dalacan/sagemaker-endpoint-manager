@@ -13,20 +13,29 @@ def handler(event, context):
     else:
         body = json.dumps(payload)
     
-    response = runtime.invoke_endpoint(
-        EndpointName=ENDPOINT_NAME,
-        Body=body,
-        ContentType='application/json',
-        Accept='application/json'    )
-    
-    response = response["Body"].read().decode('utf-8')
+    try:
+        response = runtime.invoke_endpoint(
+            EndpointName=ENDPOINT_NAME,
+            Body=body,
+            ContentType='application/json',
+            Accept='application/json'    )
+        
+        response = response["Body"].read().decode('utf-8')
 
-    result = {
-        "statusCode": 200,
-        "headers": {
-                'Content-Type': 'text/json'
-                    },
-        "body": response
-    }
-    
+        result = {
+            "statusCode": 200,
+            "headers": {
+                    'Content-Type': 'text/json'
+                        },
+            "body": response
+        }
+    except Exception as e:
+        result = {
+            "statusCode": 500,
+            "headers": {
+                    'Content-Type': 'text/json'
+                        },
+            "body": str(e)
+        }
+        
     return result

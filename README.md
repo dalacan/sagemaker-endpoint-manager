@@ -10,6 +10,10 @@ This solution was designed to solve a recurring problem with users leaving their
 ---
 ## What's New
 
+01/08/2023
+- Added support for loading jumpstart models which uses a Model Package (i.e. Marketplace subscription) instead of a Docker image
+- Added the ability to send custom attributes via API Gateway/AWS integration when invoking the Amazon SageMaker endpoint by specifying the `X-Amzn-SageMaker-Custom-Attributes` in the request header.
+
 27/07/2023
 - Added lambda exception handling
 - Added AWS Gateway direct AWS integration with Amazon SageMaker. To use AWS integration, set the `type` in the `integration` property to `api`.

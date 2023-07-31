@@ -17,8 +17,13 @@ import json
 from datetime import datetime, timedelta
 from stack.util import merge_env
 
-from utils.sagemaker_uri import *
-from utils.sagemaker_env import *
+from utils.sagemaker_helper import (
+    get_sagemaker_uris,
+    sagemaker_env,
+    get_model_spec,
+    get_model_package_arn,
+    enable_network_isolation
+)
 
 class FoundationModelStack(Stack):
 
@@ -70,20 +75,32 @@ class FoundationModelStack(Stack):
 
         # Deploy jumpstart models
         for model in configs.get("jumpstart_models", []):
+            # Get model info
+            model_info = get_sagemaker_uris(model_id=model["model_id"],
+                                        instance_type=model["inference_instance_type"],
+                                        region_name=configs["region_name"])
+
+            # Get model default environment parameters
+            model_env = sagemaker_env(model_id=model["model_id"],
+                                    region=configs["region_name"],
+                                    model_version="*")
+
+            # Get jumpstart model package arn if available
+            model_specs = get_model_spec(
+                                model_id=model["model_id"],
+                                model_version="*",
+                                region=configs["region_name"]
+            )
+
+            model_package_arn = get_model_package_arn(
+                                model_specs=model_specs,
+                                region=configs["region_name"]
+            )
+
+            is_network_isolation_enabled = enable_network_isolation(model_specs=model_specs)
+
             if model["inference_type"] == "realtime":
                 # Create real-time endpoint
-                
-                # Get model info
-                model_info = get_sagemaker_uris(model_id=model["model_id"],
-                                            instance_type=model["inference_instance_type"],
-                                            region_name=configs["region_name"])
-
-                # Get model default environment parameters
-                model_env = sagemaker_env(model_id=model["model_id"],
-                                        region=configs["region_name"],
-                                        model_version="*")
-
-
                 # environment = {
                 #                     "MODEL_CACHE_ROOT": "/opt/ml/model",
                 #                     "SAGEMAKER_ENV": "1",
@@ -122,7 +139,9 @@ class FoundationModelStack(Stack):
                                             instance_type = model_info["instance_type"],
 
                                             environment = environment,
-                                            deploy_enable = False
+                                            deploy_enable = False,
+                                            model_package_arn=model_package_arn,
+                                            enable_network_isolation=is_network_isolation_enabled
                 )
                 
                 endpoint.node.add_dependency(role)
@@ -194,6 +213,7 @@ class FoundationModelStack(Stack):
                                                             request_parameters={
                                                                 "integration.request.header.Content-Type": "method.request.header.Content-Type",
                                                                 "integration.request.header.Accept": "method.request.header.Accept",
+                                                                "integration.request.header.X-Amzn-SageMaker-Custom-Attributes": "method.request.header.X-Amzn-SageMaker-Custom-Attributes"
                                                             },
                                                             credentials_role=api_stack.api_gateway_role,
                                                             integration_responses=[
@@ -226,6 +246,7 @@ class FoundationModelStack(Stack):
                                         request_parameters={
                                                                 "method.request.header.Content-Type": True,
                                                                 "method.request.header.Accept": True,
+                                                                "method.request.header.X-Amzn-SageMaker-Custom-Attributes": False
                                                             },
                                                             method_responses=[
                                                                 apigateway.MethodResponse(status_code="200"),
@@ -243,7 +264,6 @@ class FoundationModelStack(Stack):
                                                                 ),
                                                             ]
                                             )
-                    
                     
             elif model["inference_type"] == "async":
                 # Create async endpoint
@@ -310,6 +330,8 @@ class FoundationModelStack(Stack):
                                 success_topic=success_topic.topic_arn,
                                 error_topic=error_topic.topic_arn,
                                 s3_async_bucket=s3_async.bucket_name,
+                                model_package_arn=model_package_arn,
+                                enable_network_isolation=is_network_isolation_enabled
                 )
                 endpoint.node.add_dependency(role)
                 endpoint.node.add_dependency(sts_policy)

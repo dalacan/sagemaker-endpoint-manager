@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import os
-from utils.sagemaker_uri import *
-from utils.sagemaker_env import *
 import aws_cdk as cdk
 from stack.api_stack import APIStack
 from stack.foundation_model_stack import FoundationModelStack

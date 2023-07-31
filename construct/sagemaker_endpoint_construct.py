@@ -3,7 +3,7 @@ from aws_cdk import (
     CfnOutput
 )
 from constructs import Construct
-
+from typing import Optional
 
 class SageMakerEndpointConstruct(Construct):
 
@@ -11,28 +11,43 @@ class SageMakerEndpointConstruct(Construct):
         project_prefix: str,
         role_arn: str,
         model_name: str,
-        model_bucket_name: str,
-        model_bucket_key: str,
-        model_docker_image: str,
+        model_bucket_name: Optional[str],
+        model_bucket_key: Optional[str],
+        model_docker_image: Optional[str],
         variant_name: str,
         variant_weight: int,
         instance_count: int,
         instance_type: str,
         environment: dict,
-        deploy_enable: bool) -> None:
+        deploy_enable: bool,
+        model_package_arn: Optional[str],
+        enable_network_isolation: Optional[bool]) -> None:
         super().__init__(scope, construct_id)
         
         # Do not use a custom named resource for models as these get replaced
+        if model_package_arn is not None:
+            # Deploy model using model package arn
+            container = [
+                        sagemaker.CfnModel.ContainerDefinitionProperty(
+                                model_package_name=model_package_arn
+                            )
+                        ]
+            
+        else:
+            # Deploy model using docker image
+            container = [
+                        sagemaker.CfnModel.ContainerDefinitionProperty(
+                                    image= model_docker_image,
+                                    model_data_url= f"s3://{model_bucket_name}/{model_bucket_key}",
+                                    environment= environment
+                                )
+                        ]
+
         model = sagemaker.CfnModel(self, f"{model_name}-Model",
-                           execution_role_arn= role_arn,
-                           containers=[
-                               sagemaker.CfnModel.ContainerDefinitionProperty(
-                                        image= model_docker_image,
-                                        model_data_url= f"s3://{model_bucket_name}/{model_bucket_key}",
-                                        environment= environment
-                                    )
-                               ]
-        )
+                    execution_role_arn= role_arn,
+                    containers=container,
+                    enable_network_isolation=enable_network_isolation
+            )
         
         self.config = sagemaker.CfnEndpointConfig(self, f"{model_name}-Config",
                             production_variants=[

@@ -1,0 +1,16 @@
+{
+    "Comment": "Invoke SageMAker Endpoint",
+    "StartAt": "InvokeEndpoint",
+    "States": {
+      "InvokeEndpoint": {
+        "Type": "Task",
+        "End": true,
+        "Parameters": {
+          "ContentType": "application/json",
+          "Body.$": "$.body",
+          "EndpointName.$": "$.endpointname"
+        },
+        "Resource": "arn:aws:states:::aws-sdk:sagemakerruntime:invokeEndpoint"
+      }
+    }
+  }

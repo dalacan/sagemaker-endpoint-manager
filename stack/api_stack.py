@@ -2,6 +2,7 @@ from aws_cdk import (
     # Duration,
     RemovalPolicy,
     Stack,
+    NestedStack,
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_dynamodb as dynamodb,
@@ -10,7 +11,7 @@ from aws_cdk import (
 
 from constructs import Construct
 
-class APIStack(Stack):
+class APIStack(NestedStack):
 
     def __init__(self, scope: Construct, construct_id: str, configs, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)

@@ -1,5 +1,6 @@
 from aws_cdk import (
     Stack,
+    NestedStack,
     Duration,
     aws_iam as iam,
     aws_ssm as ssm,
@@ -11,7 +12,7 @@ from aws_cdk import (
 
 from constructs import Construct
 
-class EndpointManagerStack(Stack):
+class EndpointManagerStack(NestedStack):
 
     def __init__(self, scope: Construct, construct_id: str, api_stack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)

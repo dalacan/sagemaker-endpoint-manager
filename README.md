@@ -38,6 +38,7 @@ This solution was designed to solve a recurring problem with users leaving their
   - [Real-time Endpoint Management Functions - Extending your real-time endpoint expiry time](#real-time-endpoint-management-functions---extending-your-real-time-endpoint-expiry-time)
   - [Real-time Endpoint Management Functions - Adding a new real-time endpoint](#real-time-endpoint-management-functions---adding-a-new-real-time-endpoint)
   - [Interacting with your real-time endpoint via API](#interacting-with-your-real-time-endpoint-via-api)
+  - [Asynchronously interacting with your real-time endpoint via API](#asynchronously-interacting-with-your-real-time-endpoint-via-api)
   - [Example Notebook](#example-notebook)
   - [Endpoint Manager Configurations](#endpoint-manager-configurations)
     - [**Jumpstart model**](#jumpstart-model)
@@ -172,8 +173,8 @@ This solution was designed to solve a recurring problem with users leaving their
     Deploy the end-to-end SageMaker Endpoint manager stack. This stack will deploy several nested stacks including: 
     1. API gateway stack: The API Gateway which will provide us with an internet facing API to interact with our Amazon SageMaker Endpoint and manage our Amazon SageMaker endpoint. The API Gateway is backed by a basic lambda authorizer with the authorization tokens stored in an Amazon DynamoDB database. 
     2. Endpoint Manager Stack: The stack includes several lambda functions that will be responsible for the automatic creation and deletion of your Amazon SageMaker real-time endpoints. 
-    3. ModelStack: Deploys the predefined Amazon SageMaker endpoints and passthrough lambda (if configured). This stack will deploy all models in the list of jumpstart models.
-    4. Stepfunction Stack: Stack to support asynchronous invocation of the Amazon SageMaker real-time endpoint fronted by the API Gateway
+    3. Model Stack: Deploys the predefined Amazon SageMaker endpoints and passthrough lambda (if configured). This stack will deploy all models in the list of jumpstart models.
+    4. Step function Stack: Stack to support asynchronous invocation of the Amazon SageMaker real-time endpoint fronted by the API Gateway
 
      ```
      cdk deploy SagemakerEndpointManagerStack
@@ -379,6 +380,62 @@ Expected response
     "generated_texts": [
         "..."
     ]
+}
+```
+---
+## Asynchronously interacting with your real-time endpoint via API
+
+In some cases, the inference may take more than 30 seconds which exceeds the API gateway timeout limit. As such an alternative approach to invoking the real-time Amazon SageMaker endpoint is required. This solution provide you with a mechanism to asynchronously invoke the endpoint and retrieve the response when the invocation has been completed. To run inference asynchronously, you will call the API in two step. The first to send your prompt `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/startexecution` and the second to retrieve the result `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/describeexecution`.
+
+
+Send prompt to API request
+```
+curl --location 'https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/startexecution' \
+--header 'Authorization: <YOUR TOKEN>' \
+--header 'Content-Type: application/json' \
+--data '{
+    "endpointname": "demo-Falcon40B-Endpoint",
+    "body": {"inputs": "Write a program to compute factorial in python:", "parameters": {"max_new_tokens": 200}}
+}'
+```
+
+Example Send prompt response
+```
+{
+    "executionArn": "arn:aws:states:us-east-1:xxxxxxxxxxxxx:execution:SageMakerInvokeStepfunctionD7692275-BlnWWEoa6OY7:d7bde7bb-084a-4a29-b025-98"
+}
+```
+
+Once you've sent a prompt request, you will be provided with an executionARN. You will then use this response and send it to the retrieval API. Refer to the example below.
+
+Retrieve an invocation API request
+```
+curl --location 'https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/describeexecution' \
+--header 'Authorization: <YOUR TOKEN>' \
+--header 'Content-Type: application/json' \
+--data '{
+    "executionArn": "arn:aws:states:us-east-1:xxxxxxxxxxxxx:execution:SageMakerInvokeStepfunctionD7692275-BlnWWEoa6OY7:d7bde7bb-084a-4a29-b025-98d9da47ce44"
+}'
+```
+
+If successful, you will get a response with a the status parameter as `SUCCEEDED`. If the invocation has a status of `RUNNING`, run the request again until you get a `SUCCEEDED` state. The output of the response can be found in the `output` parameter.
+ 
+Example retrieval response
+```
+{
+    "executionArn": "arn:aws:states:us-east-1:xxxxxxxxxxxxx:execution:SageMakerInvokeStepfunctionD7692275-BlnWWEoa6OY7:d7bde7bb-084a-4a29-b025-98d9da47ce44",
+    "input": "{\"endpointname\":\"demo-Falcon40B-Endpoint\",\"body\":{\"inputs\":\"Write a program to compute factorial in python:\",\"parameters\":{\"max_new_tokens\":200}}}",
+    "inputDetails": {
+        "__type": "com.amazonaws.swf.base.model#CloudWatchEventsExecutionDataDetails",
+        "included": true
+    },
+    "name": "d7bde7bb-084a-4a29-b025-98d9da47ce44",
+    "output": "{\"Body\":\"[{\\\"generated_text\\\":\\\"\\\\nYou can compute factorial in Python using the built-in function `math.factorial()`. Here's an example:\\\\n\\\\n```python\\\\nimport math\\\\n\\\\nn = 5\\\\nfactorial = math.factorial(n)\\\\nprint(factorial)\\\\n```\\\\n\\\\nThis will output `120`, which is the factorial of 5.\\\"}]\",\"ContentType\":\"application/json\",\"InvokedProductionVariant\":\"AllTraffic\"}",
+    ...
+    "startDate": 1.691411436575E9,
+    "stateMachineArn": "arn:aws:states:us-east-1:xxxxxxxxxxxxx:stateMachine:SageMakerInvokeStepfunctionD7692275-BlnWWEoa6OY7",
+    "status": "SUCCEEDED",
+    ...
 }
 ```
 

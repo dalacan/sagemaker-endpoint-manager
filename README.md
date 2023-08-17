@@ -10,7 +10,7 @@ This solution was designed to solve a recurring problem with users leaving their
 ---
 ## What's New
 
-07/08/2023
+17/08/2023
 - Added the ability to asynchronously invoke the Amazon SageMaker real-time endpoint via API gateway
 - Collapsed stacks into a single root stack for a simplified deployment 
 
@@ -166,15 +166,41 @@ This solution was designed to solve a recurring problem with users leaving their
 
 6. Deploy the SageMaker Endpoint Manager solution stack
 
+    **Note** If you're upgrading from a previous version of Amazon SageMaker Endpoint Manager, you may need to delete the existing stacks. Please refer to the following instructions [upgrade instructions](#upgrade-instructions).
+
+
     Deploy the end-to-end SageMaker Endpoint manager stack. This stack will deploy several nested stacks including: 
     1. API gateway stack: The API Gateway which will provide us with an internet facing API to interact with our Amazon SageMaker Endpoint and manage our Amazon SageMaker endpoint. The API Gateway is backed by a basic lambda authorizer with the authorization tokens stored in an Amazon DynamoDB database. 
     2. Endpoint Manager Stack: The stack includes several lambda functions that will be responsible for the automatic creation and deletion of your Amazon SageMaker real-time endpoints. 
     3. ModelStack: Deploys the predefined Amazon SageMaker endpoints and passthrough lambda (if configured). This stack will deploy all models in the list of jumpstart models.
-    4. StepfunctionStack: Stack to support asynchronous invocation of the Amazon SageMaker real-time endpoint fronted by the API Gateway
+    4. Stepfunction Stack: Stack to support asynchronous invocation of the Amazon SageMaker real-time endpoint fronted by the API Gateway
 
      ```
-     $ cdk deploy SagemakerEndpointManagerStack
+     cdk deploy SagemakerEndpointManagerStack
      ```
+
+     ### Upgrade instructions
+     If you're using an older version of Amazon SageMaker Endpoint Manager with the 3 separate stacks, you need to delete this stacks before deploying the new version. To do so, refer to the following instructions:
+
+     1. Checkout the older Amazon SageMaker version
+        
+        ```
+        git checkout 049e21e
+        ```
+     2. Delete the stacks. 
+        ```
+        cdk destroy --all
+        ```
+        If you have any existing endpoints, make sure you manually delete the endpoints.
+    3. Switch back to the main branch
+        ```
+        git checkout main
+        ```
+     4. Deploy the end-to-end SageMaker Endpoint manager stack.
+
+        ```
+        cdk deploy SagemakerEndpointManagerStack
+        ```  
 
  7.  Setup your auth
 

@@ -8,7 +8,7 @@ client = boto3.client('runtime.sagemaker')
 def handler(event, context):
 
     payload = event['body']
-    
+
     try:
         response = client.invoke_endpoint(
             EndpointName=ENDPOINT_NAME, 
@@ -16,7 +16,7 @@ def handler(event, context):
             Accept='application/json',
             Body=payload
         )
-        
+
         result = {
             "statusCode": 200,
             "headers": {
@@ -32,5 +32,5 @@ def handler(event, context):
                         },
             "body": str(e)
         }
-    
+
     return result

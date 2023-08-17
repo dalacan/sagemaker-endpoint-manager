@@ -74,11 +74,10 @@ def handler(event, context):
         else:
             print("Not found, access denied.")
             policy.denyAllMethods()
-    
 
     # Finally, build the policy
     authResponse = policy.build()
- 
+
     # return authResponse
     return json.loads(json.dumps(authResponse, default=str))
 
@@ -110,7 +109,6 @@ class AuthPolicy(object):
     allowMethods = []
     denyMethods = []
 
-    
     restApiId = "<<restApiId>>"
     """ Replace the placeholder value with a default API Gateway API id to be used in the policy. 
     Beware of using '*' since it will not simply mean any API Gateway API id, because stars will greedily expand over '/' or other separators. 

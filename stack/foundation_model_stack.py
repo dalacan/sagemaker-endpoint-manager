@@ -1,5 +1,5 @@
 from aws_cdk import (
-    Stack,
+    NestedStack,
     Duration,
     aws_iam as iam,
     aws_ssm as ssm,
@@ -25,10 +25,14 @@ from utils.sagemaker_helper import (
     enable_network_isolation
 )
 
-class FoundationModelStack(Stack):
+from stack.stepfunction_stack import StepFunctionStack
+
+class FoundationModelStack(NestedStack):
 
     def __init__(self, scope: Construct, construct_id: str, configs, api_stack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        step_function_enabled_endpoints = []
 
         # Create policies for model
         role = iam.Role(self, "Gen-AI-SageMaker-Policy", assumed_by=iam.ServicePrincipal("sagemaker.amazonaws.com"))
@@ -169,6 +173,9 @@ class FoundationModelStack(Stack):
                 
                 endpoint_arn = f'arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}'
                 resource_name = model["integration"]["properties"]["api_resource_name"]
+
+                if model.get("async_api_enabled", False):
+                    step_function_enabled_endpoints.append(endpoint_arn)
                 
                 # Check integration type
                 if model["integration"]["type"] == "lambda":
@@ -338,4 +345,6 @@ class FoundationModelStack(Stack):
                 endpoint.node.add_dependency(logs_policy)
                 endpoint.node.add_dependency(ecr_policy)
                                                                              
-        
+        stepfunction_stack = StepFunctionStack(self, "StepFunctionStack",
+                                       api_stack = api_stack,
+                                       step_function_enabled_endpoints=step_function_enabled_endpoints)

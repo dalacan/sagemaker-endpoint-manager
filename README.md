@@ -10,6 +10,10 @@ This solution was designed to solve a recurring problem with users leaving their
 ---
 ## What's New
 
+17/08/2023
+- Added the ability to asynchronously invoke the Amazon SageMaker real-time endpoint via API gateway
+- Collapsed stacks into a single root stack for a simplified deployment 
+
 01/08/2023
 - Added support for loading jumpstart models which uses a Model Package (i.e. Marketplace subscription) instead of a Docker image
 - Added the ability to send custom attributes via API Gateway/AWS integration when invoking the Amazon SageMaker endpoint by specifying the `X-Amzn-SageMaker-Custom-Attributes` in the request header.
@@ -160,33 +164,45 @@ This solution was designed to solve a recurring problem with users leaving their
     }
     ```
 
-6. Deploy the API Gateway
+6. Deploy the SageMaker Endpoint Manager solution stack
 
-    First up, we will deploy the API Gateway which will provide us with an internet facing API to interact with our Amazon SageMaker Endpoint and manage our Amazon SageMaker endpoint. The API Gateway is backed by a basic lambda authorizer with the authorization tokens stored in an Amazon DynamoDB database.
+    **Note** If you're upgrading from a previous version of Amazon SageMaker Endpoint Manager, you may need to delete the existing stacks. Please refer to the following instructions [upgrade instructions](#upgrade-instructions).
 
-     ```
-     $ cdk deploy APIStack
-     ```
 
-7. Deploy the endpoint manager stack
-
-     Deploy the lambda that will be responsible for the automatic creation and deletion of your Amazon SageMaker real-time endpoints.
-
-     **Note:** If you are not using real-time endpoints, you do not need to deploy this start.
+    Deploy the end-to-end SageMaker Endpoint manager stack. This stack will deploy several nested stacks including: 
+    1. API gateway stack: The API Gateway which will provide us with an internet facing API to interact with our Amazon SageMaker Endpoint and manage our Amazon SageMaker endpoint. The API Gateway is backed by a basic lambda authorizer with the authorization tokens stored in an Amazon DynamoDB database. 
+    2. Endpoint Manager Stack: The stack includes several lambda functions that will be responsible for the automatic creation and deletion of your Amazon SageMaker real-time endpoints. 
+    3. ModelStack: Deploys the predefined Amazon SageMaker endpoints and passthrough lambda (if configured). This stack will deploy all models in the list of jumpstart models.
+    4. Stepfunction Stack: Stack to support asynchronous invocation of the Amazon SageMaker real-time endpoint fronted by the API Gateway
 
      ```
-     $ cdk deploy EndpointManagerStack
+     cdk deploy SagemakerEndpointManagerStack
      ```
 
-7. Deploying your endpoints
+     ### Upgrade instructions
+     If you're using an older version of Amazon SageMaker Endpoint Manager with the 3 separate stacks, you need to delete this stacks before deploying the new version. To do so, refer to the following instructions:
 
-    Finally, we will deploy our Amazon SageMaker endpoints and passthrough lambda (if configured). Note, this stack will deploy all models in the list of jumpstart models.
+     1. Checkout the older Amazon SageMaker version
+        
+        ```
+        git checkout 049e21e
+        ```
+     2. Delete the stacks. 
+        ```
+        cdk destroy --all
+        ```
+        If you have any existing endpoints, make sure you manually delete the endpoints.
+    3. Switch back to the main branch
+        ```
+        git checkout main
+        ```
+     4. Deploy the end-to-end SageMaker Endpoint manager stack.
 
-    ```
-     $ cdk deploy ModelMeteredStack
-     ```
+        ```
+        cdk deploy SagemakerEndpointManagerStack
+        ```  
 
- 8.  Setup your auth
+ 7.  Setup your auth
 
      In your AWS account, you will find a Dynamodb table `auth` which stores a token (or pass code) which you will use to as an authorization token to access the APIs. Create an item in the `auth` table with an attribute `token` and set the value to your pass code which you will use when calling the API.
 
@@ -465,6 +481,7 @@ Integration specific configurations
 - [x] Add support for adding new endpoints via API
 - [x] Improve lambda error handling
 - [x] Add API gateway/AWS integration
+- [x] Add support for asynchronous invocation of Amazon SageMaker real-time endpoint
 - [ ] Add support for scheduled endpoints (i.e. M-F 9-5)
 - [ ] Add support for cognito users
 - [ ] Add support for expiry notifications

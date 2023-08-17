@@ -17,7 +17,8 @@
                     "lambda_src": "functions/falcon",
                     "api_resource_name": "falcon"
                 }
-            }
+            },
+            "async_api_enabled": true
         },
         {
             "name" : "FlanT5",
@@ -32,7 +33,8 @@
                 "properties": {
                     "api_resource_name": "flan"
                 }
-            }
+            },
+            "async_api_enabled": true
         }
     ]
 }

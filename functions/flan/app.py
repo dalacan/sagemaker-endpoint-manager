@@ -1,6 +1,6 @@
 import os
-import boto3
 import json
+import boto3
 
 # grab environment variables
 ENDPOINT_NAME = os.environ['ENDPOINT_NAME']
@@ -12,14 +12,14 @@ def handler(event, context):
         body = event['body']
     else:
         body = json.dumps(payload)
-    
+
     try:
         response = runtime.invoke_endpoint(
             EndpointName=ENDPOINT_NAME,
             Body=body,
             ContentType='application/json',
             Accept='application/json'    )
-        
+
         response = response["Body"].read().decode('utf-8')
 
         result = {

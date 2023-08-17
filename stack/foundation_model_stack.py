@@ -1,5 +1,4 @@
 from aws_cdk import (
-    Stack,
     NestedStack,
     Duration,
     aws_iam as iam,

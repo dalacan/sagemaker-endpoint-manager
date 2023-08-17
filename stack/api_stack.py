@@ -1,7 +1,5 @@
 from aws_cdk import (
-    # Duration,
     RemovalPolicy,
-    Stack,
     NestedStack,
     aws_lambda as _lambda,
     aws_apigateway as apigateway,

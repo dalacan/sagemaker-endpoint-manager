@@ -1,11 +1,11 @@
+"""Deploy the SageMaker Endpoint Manager Stack"""
 #!/usr/bin/env python3
-import os
+import json
 import aws_cdk as cdk
 from stack.sagemaker_endpoint_manager_stack import SagemakerEndpointManagerStack
-import json
 
 # Load model configurations from config file
-with open('config/configs.json') as file:
+with open('config/configs.json', encoding='UTF-8') as file:
     configs = json.load(file)
 
 # Define region to deploy stack into

@@ -1,5 +1,4 @@
 from aws_cdk import (
-    Stack,
     NestedStack,
     aws_apigateway as apigateway,
     aws_stepfunctions as sfn,

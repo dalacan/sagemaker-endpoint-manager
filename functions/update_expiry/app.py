@@ -116,7 +116,39 @@ def update_endpoint_config(endpoint_name, provision_minutes, expiry_parameter_va
      
     return time_left, expiry_str
 
-def create_update_endpoint_expiry(event):
+def create_update_endpoint_config_schedule(endpoint_name, endpoint_config_name, schedule):
+    ssm_value = {
+        "schedule": schedule,
+        "endpoint_name": endpoint_name,
+        "endpoint_config_name": endpoint_config_name
+    }
+
+    # Add new parameter
+    ssm_response = ssm_client.put_parameter(
+        Name=f"/sagemaker/endpoint/expiry/{endpoint_name}",
+        Type="String",
+        Overwrite=True,
+        Value=json.dumps(ssm_value)
+    )
+
+def get_endpoint_config_parameters(endpoint_name):
+    try:
+        # Get endpoint configuration
+        ssm_parameters = ssm_client.get_parameter(
+                Name=f"/sagemaker/endpoint/expiry/{endpoint_name}",
+                WithDecryption=False)
+    except botocore.exceptions.ClientError as error:
+        if error.response['Error']['Code'] == 'ParameterNotFound':
+            return False
+        else:
+            response = {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Error retrieving endpoint"})
+            }
+
+    return ssm_parameters
+
+def create_update_endpoint_schedule(event):
     if event['body'] is not None :
         # Update expiry
         body = json.loads(event["body"])
@@ -128,31 +160,42 @@ def create_update_endpoint_expiry(event):
             }
             return response
 
-        try:
-            endpoint_name = body['EndpointName']
-            expiry_parameter = ssm_client.get_parameter(
-                    Name=f"/sagemaker/endpoint/expiry/{endpoint_name}",
-                    WithDecryption=False)
-            
-            # Get expiry value
-            expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
+        endpoint_name = body['EndpointName']
+        endpoint_parameters = get_endpoint_config_parameters(endpoint_name)
+        
+        # Check if a schedule was provided
+        if "schedule" in body:
+            # Update schedule
+            if endpoint_parameters is False:
+                # Endpoint ssm parameters does not exist
+                if 'EndpointConfigName' in body:
+                    print("Creating new endpoint config")
+                    endpoint_config_name = body['EndpointConfigName']
+            else:
+                print("Updating schedule")
+                endpoint_parameters_values = json.loads(endpoint_parameters['Parameter']['Value'])
+                endpoint_config_name = endpoint_parameters_values['endpoint_config_name']
 
-            print("Updating endpoint")
-            time_left, expiry_str = update_endpoint_config(endpoint_name, body['minutes'], expiry_parameter_values)
+            
+            # Create/Update schedule
+            create_update_endpoint_config_schedule(endpoint_name, endpoint_config_name, body['schedule'])
 
             response =  {
-                        "statusCode": 200,
-                        "headers": {
-                            "Content-Type": "application/json"
-                        },
-                        "body": json.dumps({
-                            "EndpointName": endpoint_name,
-                            "EndpointExpiry ": expiry_str,
-                            "TimeLeft": str(time_left)
-                        })
-                    }
-        except botocore.exceptions.ClientError as error:
-            if error.response['Error']['Code'] == 'ParameterNotFound':
+                            "statusCode": 200,
+                            "headers": {
+                                "Content-Type": "application/json"
+                            },
+                            "body": json.dumps({
+                                "EndpointName": endpoint_name,
+                                "Schedule": body['schedule']
+                            })
+                        }
+
+
+        elif "minutes" in body:
+            # Update provision expiry
+            if endpoint_parameters is False:
+                # Endpoint ssm parameters does not exist
                 if 'EndpointConfigName' in body:
                     print("Creating new endpoint config")
                     time_left, expiry_str = create_endpoint_config(endpoint_name, body['EndpointConfigName'], body['minutes'])
@@ -173,11 +216,22 @@ def create_update_endpoint_expiry(event):
                         "statusCode": 400,
                         "body": json.dumps({"error": "EndpointName not found/Endpoint config name required"})
                     }
-            else:
-                response = {
-                    "statusCode": 400,
-                    "body": json.dumps({"error": "Error retrieving endpoint"})
-                }
+            else:                           
+                print("Updating endpoint configurations")
+                endpoint_parameters_values = json.loads(endpoint_parameters['Parameter']['Value'])
+                time_left, expiry_str = update_endpoint_config(endpoint_name, body['minutes'], endpoint_parameters_values)
+
+                response =  {
+                            "statusCode": 200,
+                            "headers": {
+                                "Content-Type": "application/json"
+                            },
+                            "body": json.dumps({
+                                "EndpointName": endpoint_name,
+                                "EndpointExpiry ": expiry_str,
+                                "TimeLeft": str(time_left)
+                            })
+                        }
     else:
         response = {
             "statusCode": 400,
@@ -192,7 +246,7 @@ def handler(event, context):
     if http_method == "GET":
         response = get_endpoint_expiry_info(event)
     elif http_method == "POST":
-        response = create_update_endpoint_expiry(event)
+        response = create_update_endpoint_schedule(event)
     else:
         # Return an error message for unsupported methods
         response = {

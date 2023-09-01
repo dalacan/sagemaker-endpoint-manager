@@ -17,18 +17,53 @@ class EndpointManagerStack(NestedStack):
         super().__init__(scope, construct_id, **kwargs)
 
         ssm_arn = f"arn:aws:ssm:{self.region}:{self.account}:parameter/sagemaker/endpoint/expiry/*"
+
+        # Create create endpoint lambda
+        create_endpoint_handler = self.create_create_endpoint_function()
         
         # Create delete endpoint lambda
-        delete_endpoint_handler, event_bridge_role = self.create_delete_endpoint_function()
+        delete_endpoint_handler = self.create_delete_endpoint_function()
         
+        # Create a role that will allow event bridge scheduler to invoke the lambda
+        event_bridge_role = iam.Role(self, 'eventBridgeRole',
+                                    assumed_by=iam.ServicePrincipal('scheduler.amazonaws.com'))
+
+        # Add policy to role to allow event bridge scheduler to invoke the lambda
+        event_bridge_role.add_to_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["lambda:InvokeFunction"],
+            resources=[
+                create_endpoint_handler.function_arn,
+                delete_endpoint_handler.function_arn
+                ],
+        ))
+
         # Create update expiry lambda
         update_expiry_handler = self.create_update_expiry_function(ssm_arn)
 
         # Create on update expiry lambda
-        self.create_on_update_expiry_function(ssm_arn, delete_endpoint_handler, event_bridge_role)
+        self.create_on_update_expiry_function(ssm_arn, create_endpoint_handler, delete_endpoint_handler, event_bridge_role)
 
         # Create api
         self.create_api(api_stack, update_expiry_handler)
+
+    def create_create_endpoint_function(self):
+        # Deploy lambda to create endpoint
+        create_endpoint_handler = _lambda.Function(self, f"CreateEndpointHandler",
+                runtime=_lambda.Runtime.PYTHON_3_9,
+                code=_lambda.Code.from_asset("functions/create_endpoint"),
+                handler="app.handler")
+
+        # Add policy to lambda to create endpoint
+        create_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["sagemaker:CreateEndpoint", "sagemaker:DescribeEndpoint"],
+            resources=[
+                "*"
+                ],
+        ))
+
+        return create_endpoint_handler
 
 
     def create_delete_endpoint_function(self):
@@ -47,20 +82,7 @@ class EndpointManagerStack(NestedStack):
                 ],
         ))
 
-        # Create a role that will allow event bridge scheduler to invoke the lambda
-        event_bridge_role = iam.Role(self, 'eventBridgeRole',
-                                    assumed_by=iam.ServicePrincipal('scheduler.amazonaws.com'))
-        
-        # Add policy to role to allow event bridge scheduler to invoke the lambda
-        event_bridge_role.add_to_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["lambda:InvokeFunction"],
-            resources=[
-                delete_endpoint_handler.function_arn
-                ],
-        ))
-
-        return delete_endpoint_handler, event_bridge_role
+        return delete_endpoint_handler
 
     def create_update_expiry_function(self, ssm_arn):
         update_expiry_handler = _lambda.Function(self, f"UpdateExpiryHandler",
@@ -81,12 +103,13 @@ class EndpointManagerStack(NestedStack):
 
         return update_expiry_handler
 
-    def create_on_update_expiry_function(self, ssm_arn, delete_endpoint_handler, event_bridge_role):
+    def create_on_update_expiry_function(self, ssm_arn, create_endpoint_handler, delete_endpoint_handler, event_bridge_role):
         on_update_expiry_handler = _lambda.Function(self, f"OnUpdateExpiryHandler",
                 runtime=_lambda.Runtime.PYTHON_3_9,
                 code=_lambda.Code.from_asset("functions/on_update_expiry"),
                 handler="app.handler",
                 environment={
+                    "CREATE_ENDPOINT_LAMBDA_ARN": create_endpoint_handler.function_arn,
                     "DELETE_ENDPOINT_LAMBDA_ARN": delete_endpoint_handler.function_arn,
                     "EVENT_BRIDGE_ROLE_ARN": event_bridge_role.role_arn},
                 timeout=Duration.seconds(30))
@@ -112,7 +135,7 @@ class EndpointManagerStack(NestedStack):
         # Add scheduler policy
         on_update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
-            actions=["scheduler:CreateSchedule", "scheduler:GetSchedule", "scheduler:UpdateSchedule"],
+            actions=["scheduler:CreateSchedule", "scheduler:GetSchedule", "scheduler:UpdateSchedule", "scheduler:CreateScheduleGroup", "scheduler:DeleteSchedule", "scheduler:ListSchedules"],
             resources=[
                 "*"
             ],

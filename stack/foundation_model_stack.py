@@ -154,22 +154,30 @@ class FoundationModelStack(NestedStack):
                 endpoint.node.add_dependency(ecr_policy)
 
                 endpoint_name = f'{configs["project_prefix"]}-{model["name"]}-Endpoint'
+                ssm_value = None
+                if 'initial_provision_minutes' in model["schedule"]:
+                    # Set endpoint expiry
+                    now = datetime.utcnow()
+                    expiry = now + timedelta(minutes=model["schedule"]["initial_provision_minutes"])
 
-                # Set endpoint expiry
-                now = datetime.utcnow()
-                expiry = now + timedelta(minutes=model["schedule"]["initial_provision_minutes"])
+                    ssm_value = {
+                        "expiry": expiry.strftime("%d-%m-%Y-%H-%M-%S"),
+                        "endpoint_name": endpoint_name,
+                        "endpoint_config_name": endpoint.config.attr_endpoint_config_name
+                    }
+                elif type(model["schedule"]) is list:
+                    ssm_value = {
+                        "schedule": model["schedule"],
+                        "endpoint_name": endpoint_name,
+                        "endpoint_config_name": endpoint.config.attr_endpoint_config_name
+                    }
 
-                expiry_ssm_value = {
-                    "expiry": expiry.strftime("%d-%m-%Y-%H-%M-%S"),
-                    "endpoint_name": endpoint_name,
-                    "endpoint_config_name": endpoint.config.attr_endpoint_config_name
-                }
-
-                # Create default SSM parameter to manage endpoint
-                expiry_ssm = ssm.StringParameter(self, 
-                                                f"{endpoint_name}-expiry", 
-                                                parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", 
-                                                string_value=json.dumps(expiry_ssm_value))
+                if ssm_value is not None:
+                    # Create default SSM parameter to manage endpoint
+                    expiry_ssm = ssm.StringParameter(self, 
+                                                    f"{endpoint_name}-expiry", 
+                                                    parameter_name=f"/sagemaker/endpoint/expiry/{endpoint_name}", 
+                                                    string_value=json.dumps(ssm_value))
                 
                 endpoint_arn = f'arn:aws:sagemaker:{self.region}:{self.account}:endpoint/{endpoint_name.lower()}'
                 resource_name = model["integration"]["properties"]["api_resource_name"]

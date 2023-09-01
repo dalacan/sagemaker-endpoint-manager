@@ -113,7 +113,7 @@ def update_endpoint_config(endpoint_name, provision_minutes, expiry_parameter_va
         Overwrite=True,
         Value=json.dumps(expiry_parameter_values)
     )
-
+     
     return time_left, expiry_str
 
 def create_update_endpoint_expiry(event):
@@ -134,6 +134,7 @@ def create_update_endpoint_expiry(event):
                     Name=f"/sagemaker/endpoint/expiry/{endpoint_name}",
                     WithDecryption=False)
             
+            # Get expiry value
             expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
 
             print("Updating endpoint")

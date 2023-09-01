@@ -16,43 +16,59 @@ class EndpointManagerStack(NestedStack):
     def __init__(self, scope: Construct, construct_id: str, api_stack, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Create endpoint manager lambdas
-        start_endpoint_handler = _lambda.Function(self, f"StartEndpointHandler",
-                runtime=_lambda.Runtime.PYTHON_3_9,
-                code=_lambda.Code.from_asset("functions/start_stop_endpoint"),
-                handler="app.handler",
-                timeout=Duration.seconds(30))
-
-        # Add policy to lambda to create endpoint
-        start_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
-            effect=iam.Effect.ALLOW,
-            actions=["sagemaker:CreateEndpoint", "sagemaker:DeleteEndpoint", "sagemaker:DescribeEndpoint"],
-            resources=[
-                "*"
-            ],
-        ))
-
         ssm_arn = f"arn:aws:ssm:{self.region}:{self.account}:parameter/sagemaker/endpoint/expiry/*"
         
-        # Add SSM read access
-        start_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
+        # Create delete endpoint lambda
+        delete_endpoint_handler, event_bridge_role = self.create_delete_endpoint_function()
+        
+        # Create update expiry lambda
+        update_expiry_handler = self.create_update_expiry_function(ssm_arn)
+
+        # Create on update expiry lambda
+        self.create_on_update_expiry_function(ssm_arn, delete_endpoint_handler, event_bridge_role)
+
+        # Create api
+        self.create_api(api_stack, update_expiry_handler)
+
+
+    def create_delete_endpoint_function(self):
+        # Deploy lambda to delete endpoint
+        delete_endpoint_handler = _lambda.Function(self, f"DeleteEndpointHandler",
+                runtime=_lambda.Runtime.PYTHON_3_9,
+                code=_lambda.Code.from_asset("functions/delete_endpoint"),
+                handler="app.handler")
+
+        # Add policy to lambda to delete endpoint
+        delete_endpoint_handler.add_to_role_policy(iam.PolicyStatement(
             effect=iam.Effect.ALLOW,
-            actions=["ssm:DescribeParameters", "ssm:GetParameter", "ssm:GetParameterHistory", "ssm:GetParameters", "ssm:GetParametersByPath"],
+            actions=["sagemaker:DeleteEndpoint", "sagemaker:DescribeEndpoint"],
             resources=[
-                ssm_arn
-            ],
+                "*"
+                ],
         ))
 
-        start_stop_endpoint_rule = events.Rule(self, 'eventStartStopLambdaRule',
-                                           description='Start/Stop Endpoint Lambda Rule',
-                                           schedule=events.Schedule.rate(Duration.minutes(1)),
-                                           targets=[targets.LambdaFunction(handler=start_endpoint_handler)])
+        # Create a role that will allow event bridge scheduler to invoke the lambda
+        event_bridge_role = iam.Role(self, 'eventBridgeRole',
+                                    assumed_by=iam.ServicePrincipal('scheduler.amazonaws.com'))
         
+        # Add policy to role to allow event bridge scheduler to invoke the lambda
+        event_bridge_role.add_to_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["lambda:InvokeFunction"],
+            resources=[
+                delete_endpoint_handler.function_arn
+                ],
+        ))
+
+        return delete_endpoint_handler, event_bridge_role
+
+    def create_update_expiry_function(self, ssm_arn):
         update_expiry_handler = _lambda.Function(self, f"UpdateExpiryHandler",
                 runtime=_lambda.Runtime.PYTHON_3_9,
                 code=_lambda.Code.from_asset("functions/update_expiry"),
                 handler="app.handler",
-                timeout=Duration.seconds(30))
+                timeout=Duration.seconds(30)
+                    )
 
         # Add SSM read/write policy
         update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
@@ -63,6 +79,79 @@ class EndpointManagerStack(NestedStack):
             ],
         ))
 
+        return update_expiry_handler
+
+    def create_on_update_expiry_function(self, ssm_arn, delete_endpoint_handler, event_bridge_role):
+        on_update_expiry_handler = _lambda.Function(self, f"OnUpdateExpiryHandler",
+                runtime=_lambda.Runtime.PYTHON_3_9,
+                code=_lambda.Code.from_asset("functions/on_update_expiry"),
+                handler="app.handler",
+                environment={
+                    "DELETE_ENDPOINT_LAMBDA_ARN": delete_endpoint_handler.function_arn,
+                    "EVENT_BRIDGE_ROLE_ARN": event_bridge_role.role_arn},
+                timeout=Duration.seconds(30))
+
+        # Add policy to create endpoint
+        on_update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["sagemaker:CreateEndpoint", "sagemaker:DescribeEndpoint", "sagemaker:DeleteEndpoint"],
+            resources=[
+                "*"
+            ],
+        ))
+
+        # Add SSM read/write policy
+        on_update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["ssm:GetParameter"],
+            resources=[
+                ssm_arn
+            ],
+        ))
+
+        # Add scheduler policy
+        on_update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["scheduler:CreateSchedule", "scheduler:GetSchedule", "scheduler:UpdateSchedule"],
+            resources=[
+                "*"
+            ],
+        ))
+
+        # Add policy to pass role
+        on_update_expiry_handler.add_to_role_policy(iam.PolicyStatement(
+            effect=iam.Effect.ALLOW,
+            actions=["iam:PassRole"],
+            resources=[
+                event_bridge_role.role_arn
+            ],
+            conditions={
+                "StringLike": {
+                    "iam:PassedToService": [
+                        "scheduler.amazonaws.com"
+                    ]
+                }
+            }
+        ))
+
+        # Create an event rule to trigger the lambda base on a creation/update to system parameter
+        update_expiry_rule = events.Rule(self, 'eventUpdateExpiryLambdaRule',
+                                           description='Update Endpoint Expiry Lambda Rule',
+                                           event_pattern=events.EventPattern(
+                                               source=["aws.ssm"],
+                                               detail_type=["Parameter Store Change"],
+                                               detail={
+                                                "name": [
+                                                    {"prefix": "/sagemaker/endpoint/expiry/"}
+                                                ]
+                                               }
+                                           )
+        )
+
+        update_expiry_rule.add_target(targets.LambdaFunction(handler=on_update_expiry_handler))
+
+
+    def create_api(self, api_stack, update_expiry_handler):
         # Add lambda to api gateway
         post_update_expiry_integration = apigateway.LambdaIntegration(update_expiry_handler,
                                                                   request_templates={"application/json": '{ "statusCode": "200" }'})

@@ -35,6 +35,27 @@
                 }
             },
             "async_api_enabled": true
+        },
+        {
+            "name" : "FlanT5-Schedule",
+            "model_id" : "huggingface-text2text-flan-t5-xxl",
+            "inference_instance_type" : "ml.g5.12xlarge",
+            "inference_type": "realtime",
+            "schedule": [
+                {
+                    "name": "workdays",
+                    "start_time": "09:00",
+                    "stop_time": "17:00",
+                    "days": ["mon", "tue", "wed", "thu", "fri"]
+                }
+            ],
+            "integration": {
+                "type": "api",
+                "properties": {
+                    "api_resource_name": "flan2"
+                }
+            },
+            "async_api_enabled": true
         }
     ]
 }

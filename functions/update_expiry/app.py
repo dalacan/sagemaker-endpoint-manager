@@ -20,6 +20,14 @@ def get_expiry(expiry_parameter_values):
 
     return endpoint_expiry_info
 
+def get_schedule(parameter_values):
+    schedule = {
+        "EndpointName": parameter_values['endpoint_name'],
+        "Schedule": parameter_values['schedule']
+    }
+
+    return schedule
+
 def get_endpoint_expiry_info(event):
     if event['queryStringParameters'] is not None and 'EndpointName' in event['queryStringParameters']:
         print("Getting specific endpoint")
@@ -27,16 +35,20 @@ def get_endpoint_expiry_info(event):
         expiry_parameter = ssm_client.get_parameter(
             Name=f"/sagemaker/endpoint/expiry/{event['queryStringParameters']['EndpointName']}",
             WithDecryption=False)
-        expiry_parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
+        parameter_values = json.loads(expiry_parameter['Parameter']['Value'])
         
-        endpoint_expiry_info = get_expiry(expiry_parameter_values)
+        if 'expiry' in parameter_values:
+            endpoint_info = get_expiry(parameter_values)
+
+        if 'schedule' in parameter_values:
+            endpoint_info = get_schedule(parameter_values)
 
         response =  {
             "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json"
             },
-            "body": json.dumps(endpoint_expiry_info)
+            "body": json.dumps(endpoint_info)
         }
     else:
         print("Getting list of endpoint expiry")
@@ -55,18 +67,25 @@ def get_endpoint_expiry_info(event):
             result.extend(ssm_response["Parameters"])
 
         # Process each endpoint expiry configuration
-        endpoint_expiry_info = []
+        endpoint_info = []
         for parameter in result:
             print("Processing endpoint")
             parameter_values = json.loads(parameter['Value'])
-            endpoint_expiry_info.append(get_expiry(parameter_values))
+
+            if 'expiry' in parameter_values:
+                # endpoint_expiry_info = get_expiry(parameter_values)
+                endpoint_info.append(get_expiry(parameter_values))
+
+            if 'schedule' in parameter_values:
+                endpoint_info.append(get_schedule(parameter_values))
+            
 
         response =  {
             "statusCode": 200,
             "headers": {
                 "Content-Type": "application/json"
             },
-            "body": json.dumps(endpoint_expiry_info)
+            "body": json.dumps(endpoint_info)
         }
 
     return response

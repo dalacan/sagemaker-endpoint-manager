@@ -539,7 +539,7 @@ This section provides further examples on how to configure your endpoint to run 
 }
 ```
 
-**Example 2: Running an endpoint for a specific date
+**Example 2: Running an endpoint for a specific date**
 ```
  {
     "name" : "FlanT5",

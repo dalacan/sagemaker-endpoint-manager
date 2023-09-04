@@ -10,6 +10,9 @@ This solution was designed to solve a recurring problem with users leaving their
 ---
 ## What's New
 
+04/09/2023
+- Added support for interval or date schedules to automate provisioning of endpoints. (M-F, 9am-5pm or 31/12/2023, 9am-3pm)
+
 17/08/2023
 - Added the ability to asynchronously invoke the Amazon SageMaker real-time endpoint via API gateway
 - Collapsed stacks into a single root stack for a simplified deployment 
@@ -39,10 +42,12 @@ This solution was designed to solve a recurring problem with users leaving their
   - [Real-time Endpoint Management Functions - Adding a new real-time endpoint](#real-time-endpoint-management-functions---adding-a-new-real-time-endpoint)
   - [Interacting with your real-time endpoint via API](#interacting-with-your-real-time-endpoint-via-api)
   - [Asynchronously interacting with your real-time endpoint via API](#asynchronously-interacting-with-your-real-time-endpoint-via-api)
+  - [Example schedules](#example-schedules)
   - [Example Notebook](#example-notebook)
   - [Endpoint Manager Configurations](#endpoint-manager-configurations)
     - [**Jumpstart model**](#jumpstart-model)
     - [**Schedule Configuration**](#schedule-configuration)
+    - [**Schedule**](#schedule)
     - [**Integration Configuration**](#integration-configuration)
     - [**Integration Properties**](#integration-properties)
   - [How does the endpoint manager work?](#how-does-the-endpoint-manager-work)
@@ -98,72 +103,125 @@ This solution was designed to solve a recurring problem with users leaving their
 
     **Falcon 40B - Realtime Endpoint configuration using apigateway/lambda integration**
     ```
-        {
-            "name" : "Falcon40B",
-            "model_id" : "huggingface-llm-falcon-40b-instruct-bf16",
-            "inference_instance_type" : "ml.g5.12xlarge",
-            "inference_type": "realtime",
-            "schedule": {
-                "initial_provision_minutes": 90
-            },
-            "integration": {
-                "type": "lambda",
-                "properties": {
-                    "lambda_src": "functions/falcon",
-                    "api_resource_name": "falcon"
-                }
+    {
+        "name" : "Falcon40B",
+        "model_id" : "huggingface-llm-falcon-40b-instruct-bf16",
+        "inference_instance_type" : "ml.g5.12xlarge",
+        "inference_type": "realtime",
+        "schedule": {
+            "initial_provision_minutes": 90
+        },
+        "integration": {
+            "type": "lambda",
+            "properties": {
+                "lambda_src": "functions/falcon",
+                "api_resource_name": "falcon"
             }
         }
+    }
     ```
 
     **FLAN T5 - Realtime Endpoint configuration using apigateway/lambda integration**
     ```
     {
-            "name" : "FlanT5",
-            "model_id" : "huggingface-text2text-flan-t5-xxl",
-            "inference_instance_type" : "ml.g5.12xlarge",
-            "inference_type": "realtime",
-            "schedule": {
-                "initial_provision_minutes": 0
-            },
-            "integration": {
-                "type": "lambda",
-                "properties": {
-                    "lambda_src": "functions/flan",
-                    "api_resource_name": "flan"
-                }
+        "name" : "FlanT5",
+        "model_id" : "huggingface-text2text-flan-t5-xxl",
+        "inference_instance_type" : "ml.g5.12xlarge",
+        "inference_type": "realtime",
+        "schedule": {
+            "initial_provision_minutes": 0
+        },
+        "integration": {
+            "type": "lambda",
+            "properties": {
+                "lambda_src": "functions/flan",
+                "api_resource_name": "flan"
             }
         }
+    }
     ```
 
     **FLAN T5 - Realtime Endpoint configuration using API Gateway/AWS Integration**
     ```
     {
-            "name" : "FlanT5",
-            "model_id" : "huggingface-text2text-flan-t5-xxl",
-            "inference_instance_type" : "ml.g5.12xlarge",
-            "inference_type": "realtime",
-            "schedule": {
-                "initial_provision_minutes": 0
-            },
-            "integration": {
-                "type": "api",
-                "properties": {
-                    "api_resource_name": "flan"
-                }
+        "name" : "FlanT5",
+        "model_id" : "huggingface-text2text-flan-t5-xxl",
+        "inference_instance_type" : "ml.g5.12xlarge",
+        "inference_type": "realtime",
+        "schedule": {
+            "initial_provision_minutes": 0
+        },
+        "integration": {
+            "type": "api",
+            "properties": {
+                "api_resource_name": "flan"
             }
         }
+    }
     ```
 
     **FLAT T5 - Asynchronous Endpoint configuration**
     ```
     {
-            "name" : "FlanT5Async",
-            "model_id" : "huggingface-text2text-flan-t5-xxl",
-            "inference_instance_type" : "ml.g5.8xlarge",
-            "inference_type": "async"
+        "name" : "FlanT5Async",
+        "model_id" : "huggingface-text2text-flan-t5-xxl",
+        "inference_instance_type" : "ml.g5.8xlarge",
+        "inference_type": "async"
     }
     ```
+
+    **Running an endpoint on weekdays 9am-5pm**
+    ```
+    {
+        "name" : "FlanT5",
+        "model_id" : "huggingface-text2text-flan-t5-xxl",
+        "inference_instance_type" : "ml.g5.12xlarge",
+        "inference_type": "realtime",
+        "schedule": [
+            {
+                "name": "workdays",
+                "start_time": "09:00",
+                "stop_time": "17:00",
+                "days": ["mon", "tue", "wed", "thu", "fri"],
+                "timezone: "Australia/Melbourne"
+            }
+        ],
+        "integration": {
+            "type": "api",
+            "properties": {
+                "api_resource_name": "flan"
+            }
+        }
+    }
+    ```
+
+    **Running an endpoint on a specific date from 9am-5pm**
+    ```
+    {
+        "name" : "FlanT5",
+        "model_id" : "huggingface-text2text-flan-t5-xxl",
+        "inference_instance_type" : "ml.g5.12xlarge",
+        "inference_type": "realtime",
+        "schedule": [
+            {
+                "name": "event-one",
+                "start_time": "09:00",
+                "stop_time": "17:00",
+                "date": "31/12/2023",
+                "timezone: "Australia/Melbourne"
+            }
+        ],
+        "integration": {
+            "type": "api",
+            "properties": {
+                "api_resource_name": "flan"
+            }
+        }
+    }
+    ```
+
+    For more schedule examples, refer to the [schedule example section](#example-schedules).
+
 
 6. Deploy the SageMaker Endpoint Manager solution stack
 
@@ -385,7 +443,11 @@ Expected response
 ---
 ## Asynchronously interacting with your real-time endpoint via API
 
-In some cases, the inference may take more than 30 seconds which exceeds the API gateway timeout limit. As such an alternative approach to invoking the real-time Amazon SageMaker endpoint is required. This solution provide you with a mechanism to asynchronously invoke the endpoint and retrieve the response when the invocation has been completed. To run inference asynchronously, you will call the API in two step. The first to send your prompt `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/startexecution` and the second to retrieve the result `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/describeexecution`.
+In some cases, the inference may take more than 30 seconds which exceeds the API gateway timeout limit. As such an alternative approach to invoking the real-time Amazon SageMaker endpoint is required. This solution provide you with a mechanism to asynchronously invoke the endpoint and retrieve the response when the invocation has been completed. To run inference asynchronously, you will call the API in two step. 
+
+**Note** In order to use the asynchronous functionality, make sure you set the `async_api_enabled` parameter for your endpoint to `true`.
+
+The first step to using this functionality is to send your prompt to the `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/startexecution` API. Next you can retrieve the result using the  `https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/describeexecution` API.
 
 
 Send prompt to API request
@@ -440,6 +502,76 @@ Example retrieval response
 ```
 
 ---
+## Example schedules
+
+This section provides further examples on how to configure your endpoint to run on a schedule.
+
+**Example 1: Running an endpoint 9am to 5pm from Monday to Thursday and 9am to 12pm on Friday**
+
+```
+ {
+    "name" : "FlanT5",
+    "model_id" : "huggingface-text2text-flan-t5-xxl",
+    "inference_instance_type" : "ml.g5.12xlarge",
+    "inference_type": "realtime",
+    "schedule": [
+        {
+            "name": "workdays-m-t",
+            "start_time": "09:00",
+            "stop_time": "17:00",
+            "days": ["mon", "tue", "wed", "thu"],
+            "timezone: "Australia/Melbourne"
+        },
+        {
+            "name": "workdays-f",
+            "start_time": "09:00",
+            "stop_time": "12:00",
+            "days": ["fri"],
+            "timezone: "Australia/Melbourne"
+        }
+    ],
+    "integration": {
+        "type": "api",
+        "properties": {
+            "api_resource_name": "flan"
+        }
+    }
+}
+```
+
+**Example 2: Running an endpoint for a specific date
+```
+ {
+    "name" : "FlanT5",
+    "model_id" : "huggingface-text2text-flan-t5-xxl",
+    "inference_instance_type" : "ml.g5.12xlarge",
+    "inference_type": "realtime",
+    "schedule": [
+        {
+            "name": "event-one",
+            "start_time": "09:00",
+            "stop_time": "17:00",
+            "date": "01/01/2024",
+            "timezone: "Australia/Melbourne"
+        },
+        {
+            "name": "event-two",
+            "start_time": "09:00",
+            "stop_time": "17:00",
+            "date": "31/12/2023",
+            "timezone: "Australia/Melbourne"
+        }
+    ]
+    "integration": {
+        "type": "api",
+        "properties": {
+            "api_resource_name": "flan"
+        }
+    }
+}
+```
+
+---
 ## Example Notebook
 
 You can also interact with the API gateway via notebook. To do so, clone this repository or copy `00-api_gateway_managed_endpoint.ipynb` to your notebook environment (i.e. Amazon SageMaker Studio) and run through the instructions in the notebook.
@@ -485,18 +617,55 @@ Jumpstart model configurations
     - Required: Yes
     - Valid Options: `realtime` | `async`
   - `schedule`
-    - Description: Schedule configuration for the endpoint
-    - Type: [Schedule Configuration](#schedule-config) object
+    - Description: Schedule configuration for the endpoint or array of Schedule. Use Schedule configuration for specifying endpoint expiry times and array of Schedule to define an interval or date base schedule.
+    - Type: [Schedule Configuration](#schedule-config) object or Array of [Schedule](#schedule)
   - `integration`
     - Description: Endpoint integration configurations.
     - Type: [Integration](#integration-configuration) object.
+  -  `async_api_enabled`
+     -  Description: Enable asynchronous execution of real-time endpoint.
+     -  Type: Boolean
+     -  Required: No (Default: `false`)
+     -  Valid Options: `true`|`false`
 
 
 ### **Schedule Configuration**
-SageMaker Endpoint Schedule configuration (Currently supports expiring endpoints).
+SageMaker Endpoint Schedule configuration.
 - `initial_provision_minutes`
     - Description: Initial time the endpoint will be provisioned for when the CDK stack is deployed in minutes.
     - Type: Integer
+
+### **Schedule**
+Schedule definition for the endpoint. This can exists as either an interval based (days of month and time) or date based (date and time).
+
+**Note** When defining a schedule, either specify the days or date for each entry.
+
+- `name`
+  - Description: Name of the schedule (i.e. workdays)
+  - Type: String
+  - Required: Yes
+- `start_time`
+  - Description: Time to create the endpoint. (i.e. 23:59)
+  - Type: Time
+  - Required: Yes
+  - Valid Format: hh:mm
+- `stop_time`
+  - Description: Time to delete the endpoint. (i.e. 23:59)
+  - Type: Time
+  - Required: Yes
+  - Valid Format: hh:mm
+- `days`
+  - Description: An array of days of the week that the endpoint will start/stop.
+  - Type: Array of day
+  - Example: ["mon", "tue", "wed", "thu", "fri"]
+- `date`
+  - Description: Date to start/stop the endpoint.
+  - Type: Date
+  - Valid Format: dd/mm/yyyy
+- `timezone`
+  - Description: Timezone identifier to use that the schedule will run on.
+  - Type: String
+  - Valid Options: Refer to List of TZ identifier here, https://en.wikipedia.org/wiki/List_of_tz_database_time_zones, for valid options.
 
 
 ### **Integration Configuration**
@@ -539,7 +708,7 @@ Integration specific configurations
 - [x] Improve lambda error handling
 - [x] Add API gateway/AWS integration
 - [x] Add support for asynchronous invocation of Amazon SageMaker real-time endpoint
-- [ ] Add support for scheduled endpoints (i.e. M-F 9-5)
+- [x] Add support for scheduled endpoints (i.e. M-F 9-5)
 - [ ] Add support for cognito users
 - [ ] Add support for expiry notifications
 - [ ] Add UI to manage endpoint expiry

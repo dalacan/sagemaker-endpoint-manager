@@ -18,6 +18,7 @@ def create_endpoint(endpoint_name, endpoint_config_name):
 def handler(event, context):
     # Get endpoint name
     endpoint_name = event['EndpointName']
+    endpoint_config_name = event['EndpointConfigName']
 
     # Check if endpoint exists
     try:

@@ -153,12 +153,12 @@ def generate_cron_expression(time, days):
 def generate_one_time_schedule(date, time):
     date_time_obj = datetime.strptime(f'{date} {time}', '%d/%m/%Y %H:%M')
 
-    one_time_schedule = f'on({date_time_obj.strftime("%Y-%m-%dT%H:%M:%S")}'
+    one_time_schedule = f'at({date_time_obj.strftime("%Y-%m-%dT%H:%M:%S")})'
 
     return one_time_schedule
 
 
-def create_endpoint_schedule(endpoint_name, schedules):
+def create_endpoint_schedule(endpoint_name, endpoint_config_name, schedules):
     scheduler_group_name = f"sem-endpoint-group-{endpoint_name}"
     # Create scheduler group (if not exists)
     create_scheduler_group(scheduler_group_name)
@@ -190,6 +190,11 @@ def create_endpoint_schedule(endpoint_name, schedules):
         start_endpoint_schedule_name = f"sem-start-endpoint-{endpoint_name}-{schedule['name'].lower()}"
         stop_endpoint_schedule_name = f"sem-stop-endpoint-{endpoint_name}-{schedule['name'].lower()}"
 
+        # Default timezone to UTC
+        timezone = 'UTC'
+        if 'timezone' in schedule:
+            timezone = schedule['timezone']
+
         if 'days' in schedule:
             print("Day schedule")
             start_cron_expression = generate_cron_expression(schedule['start_time'], schedule['days'])
@@ -208,9 +213,14 @@ def create_endpoint_schedule(endpoint_name, schedules):
                 },
                 Target={
                     'Arn': create_endpoint_lambda_arn,
-                    'Input': json.dumps({'EndpointName': endpoint_name}),
+                    'Input': json.dumps(
+                        {
+                            'EndpointName': endpoint_name,
+                            'EndpointConfigName': endpoint_config_name
+                        }),
                     'RoleArn': event_bridge_role_arn
-                }
+                },
+                ScheduleExpressionTimezone=timezone
             )
 
             # Create a rule to delete endpoint
@@ -228,7 +238,8 @@ def create_endpoint_schedule(endpoint_name, schedules):
                     'Arn': delete_endpoint_lambda_arn,
                     'Input': json.dumps({'EndpointName': endpoint_name}),
                     'RoleArn': event_bridge_role_arn
-                }
+                },
+                ScheduleExpressionTimezone=timezone
             )
         elif 'date' in schedule:
             print("Date schedule")
@@ -238,19 +249,24 @@ def create_endpoint_schedule(endpoint_name, schedules):
                 # Create rule to start endpoint
                 scheduler_client.create_schedule(
                     # ActionAfterCompletion='DELETE',
-                    Name=schedule_name,
+                    Name=start_endpoint_schedule_name,
                     GroupName=scheduler_group_name,
                     ScheduleExpression=generate_one_time_schedule(schedule['date'], schedule['start_time']),
                     State="ENABLED",
-                    Description=f"Delete endpoint {endpoint_name}",
+                    Description=f"Create endpoint {endpoint_name}",
                     FlexibleTimeWindow={
                         'Mode': 'OFF'
                     },
                     Target={
                         'Arn': create_endpoint_lambda_arn,
-                        'Input': json.dumps({'EndpointName': endpoint_name}),
+                        'Input': json.dumps(
+                        {
+                            'EndpointName': endpoint_name,
+                            'EndpointConfigName': endpoint_config_name
+                        }),
                         'RoleArn': event_bridge_role_arn
-                    }
+                    },
+                    ScheduleExpressionTimezone=timezone
                 )
 
             if 'stop_time' in schedule:
@@ -258,9 +274,9 @@ def create_endpoint_schedule(endpoint_name, schedules):
                 # Create rule to stop endpoint
                 scheduler_client.create_schedule(
                     # ActionAfterCompletion='DELETE',
-                    Name=schedule_name,
+                    Name=stop_endpoint_schedule_name,
                     GroupName=scheduler_group_name,
-                    ScheduleExpression=generate_one_time_schedule(start_date, schedule['stop_time']),
+                    ScheduleExpression=generate_one_time_schedule(schedule['date'], schedule['stop_time']),
                     State="ENABLED",
                     Description=f"Delete endpoint {endpoint_name}",
                     FlexibleTimeWindow={
@@ -270,7 +286,8 @@ def create_endpoint_schedule(endpoint_name, schedules):
                         'Arn': delete_endpoint_lambda_arn,
                         'Input': json.dumps({'EndpointName': endpoint_name}),
                         'RoleArn': event_bridge_role_arn
-                    }
+                    },
+                    ScheduleExpressionTimezone=timezone
                 )
 
 def handler(event, context):
@@ -296,4 +313,4 @@ def handler(event, context):
 
     if 'schedule' in expiry_parameter_values:
         print("Creating schedule")
-        create_endpoint_schedule(expiry_parameter_values['endpoint_name'], expiry_parameter_values['schedule'])
+        create_endpoint_schedule(expiry_parameter_values['endpoint_name'], expiry_parameter_values['endpoint_config_name'], expiry_parameter_values['schedule'])

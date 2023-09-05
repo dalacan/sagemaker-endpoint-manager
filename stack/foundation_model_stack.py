@@ -139,7 +139,7 @@ class FoundationModelStack(NestedStack):
 
                                             variant_name = "AllTraffic",
                                             variant_weight = 1,
-                                            instance_count = 1,
+                                            instance_count = model.get("inference_instance_count", 1),
                                             instance_type = model_info["instance_type"],
 
                                             environment = environment,
@@ -208,7 +208,11 @@ class FoundationModelStack(NestedStack):
                                                                             request_templates={"application/json": '{ "statusCode": "200" }'})
                     # Add lambda to api
                     resource = api_stack.api.root.add_resource(resource_name)
-                    resource.add_method("POST", post_model_integration, authorizer=api_stack.api_authorizer)
+                    resource.add_method(
+                        "POST",
+                        post_model_integration,
+                        authorizer=None if model.get("public") else api_stack.api_authorizer,
+                    )
                 elif model["integration"]["type"] == "api":
                     # Add permission to invoke endpoint
                     api_stack.api_gateway_role.add_to_policy(iam.PolicyStatement(
@@ -257,7 +261,7 @@ class FoundationModelStack(NestedStack):
                                                     )
                     resource.add_method("POST", 
                                         post_model_integration, 
-                                        authorizer=api_stack.api_authorizer,
+                                        authorizer=None if model.get("public") else api_stack.api_authorizer,
                                         request_parameters={
                                                                 "method.request.header.Content-Type": True,
                                                                 "method.request.header.Accept": True,
@@ -336,7 +340,7 @@ class FoundationModelStack(NestedStack):
 
                                 variant_name = "AllTraffic",
                                 variant_weight = 1,
-                                instance_count = 1,
+                                instance_count = model.get("inference_instance_count", 1),
                                 instance_type = model_info["instance_type"],
 
                                 environment = environment,

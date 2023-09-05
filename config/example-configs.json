@@ -4,10 +4,12 @@
     "ddb_auth_table_name": "AuthTable",
     "jumpstart_models" :[
         {
-            "name" : "Falcon40B",
+            "name" : "Falcon40BPublic",
             "model_id" : "huggingface-llm-falcon-40b-instruct-bf16",
+            "inference_instance_count": 2,
             "inference_instance_type" : "ml.g5.12xlarge",
             "inference_type": "realtime",
+            "public": true,
             "schedule": {
                 "initial_provision_minutes": 90
             },

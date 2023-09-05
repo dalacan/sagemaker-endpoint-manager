@@ -96,13 +96,15 @@ This solution was designed to solve a recurring problem with users leaving their
     
     ### Example Jumpstart model configuration
 
-    **Falcon 40B - Realtime Endpoint configuration using apigateway/lambda integration**
+    **Falcon 40B - Realtime *publicly accessible* Endpoint configuration using apigateway/lambda integration**
     ```
         {
-            "name" : "Falcon40B",
+            "name" : "Falcon40BPublic",
             "model_id" : "huggingface-llm-falcon-40b-instruct-bf16",
+            "inference_instance_count": 2,
             "inference_instance_type" : "ml.g5.12xlarge",
             "inference_type": "realtime",
+            "public": true,
             "schedule": {
                 "initial_provision_minutes": 90
             },
@@ -475,6 +477,11 @@ Jumpstart model configurations
     - Description: Jumpstart model ID (A list of model id can be found [here](https://sagemaker.readthedocs.io/en/stable/doc_utils/pretrainedmodels.html))
     - Type: String
     - Required: Yes
+  - `inference_instance_count`
+    - Description: Number of instances to use for inference
+    - Type: Integer
+    - Required: No
+    - Default: 1
   - `inference_instance_type`
     - Description: Size of the instance type to use
     - Type: String
@@ -484,6 +491,11 @@ Jumpstart model configurations
     - Type: String
     - Required: Yes
     - Valid Options: `realtime` | `async`
+  - `public`
+    - Description: Whether to accept un-authenticated inference requests (without an API token) for this model
+    - Type: Boolean
+    - Required: No
+    - Default: false
   - `schedule`
     - Description: Schedule configuration for the endpoint
     - Type: [Schedule Configuration](#schedule-config) object

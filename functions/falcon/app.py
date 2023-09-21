@@ -10,12 +10,15 @@ def handler(event, context):
     payload = event['body']
 
     try:
-        response = client.invoke_endpoint(
-            EndpointName=ENDPOINT_NAME, 
-            ContentType='application/json',
-            Accept='application/json',
-            Body=payload
-        )
+        params = {
+            "Accept": "application/json",
+            "Body": payload,
+            "ContentType": "application/json",
+            "EndpointName": ENDPOINT_NAME,
+        }
+        if "headers" in event and "X-Amzn-SageMaker-Custom-Attributes" in event["headers"]:
+            params["CustomAttributes"] = event["headers"]["X-Amzn-SageMaker-Custom-Attributes"]
+        response = client.invoke_endpoint(**params)
 
         result = {
             "statusCode": 200,

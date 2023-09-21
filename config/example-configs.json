@@ -57,6 +57,24 @@
             "model_id" : "huggingface-text2text-flan-t5-xxl",
             "inference_instance_type" : "ml.g5.8xlarge",
             "inference_type": "async"
+        },
+        {
+            "name" : "LlamaLambda",
+            "model_id" : "meta-textgeneration-llama-2-70b-f",
+            "inference_instance_count": 1,
+            "inference_instance_type" : "ml.g5.48xlarge",
+            "inference_type": "realtime",
+            "public": true,
+            "schedule": {
+                "initial_provision_minutes": 90
+            },
+            "integration": {
+                "type": "lambda",
+                "properties": {
+                    "lambda_src": "functions/falcon",
+                    "api_resource_name": "llama"
+                }
+            }
         }
     ]
 }

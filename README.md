@@ -491,6 +491,14 @@ Jumpstart model configurations
     - Type: String
     - Required: Yes
     - Valid Options: `realtime` | `async`
+  - `model_bucket_name`:
+    - Description: Optionally override the S3 bucket name to take model data from (In case you'd like to use a modified model tarball instead of SageMaker JumpStart's default)
+    - Type: String
+    - Required: No
+  - `model_bucket_key`:
+    - Description: Optionally override the S3 object key to take model data from (In case you'd like to use a modified model tarball instead of SageMaker JumpStart's default). For example `my-folder/model.tar.gz`
+    - Type: String
+    - Required: No
   - `public`
     - Description: Whether to accept un-authenticated inference requests (without an API token) for this model
     - Type: Boolean

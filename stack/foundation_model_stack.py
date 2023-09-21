@@ -83,6 +83,11 @@ class FoundationModelStack(NestedStack):
             model_info = get_sagemaker_uris(model_id=model["model_id"],
                                         instance_type=model["inference_instance_type"],
                                         region_name=configs["region_name"])
+            # ...with ability to override from config
+            if "model_bucket_name" in model:
+                model_info["model_bucket_name"] = model["model_bucket_name"]
+            if "model_bucket_key" in model:
+                model_info["model_bucket_key"] = model["model_bucket_key"]
 
             # Get model default environment parameters
             model_env = sagemaker_env(model_id=model["model_id"],
@@ -126,7 +131,7 @@ class FoundationModelStack(NestedStack):
                                 }
 
                 environment = merge_env(environment, model_env)
-                
+
                 endpoint = SageMakerEndpointConstruct(self, f'FoundationModelEndpoint-{model["name"]}',
                                             project_prefix = configs["project_prefix"],
                                             

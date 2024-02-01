@@ -71,18 +71,18 @@ This solution was designed to solve a recurring problem with users leaving their
 
     For Mac/Linux platform:
     ```
-    $ source .venv/bin/activate
+    source .venv/bin/activate
     ```
 
     If you are a Windows platform, you would activate the virtualenv like this:
 
     ```
-    % .venv\Scripts\activate.bat
+    .venv\Scripts\activate.bat
     ```
 3. Install required dependencies
 
     ```
-    $ pip install -r requirements.txt
+    pip install -r requirements.txt
     ```
 
 4. Bootstrap your environment (if required)
@@ -90,7 +90,7 @@ This solution was designed to solve a recurring problem with users leaving their
     If you have not previously used CDK, bootstrap your environment
 
     ```
-    $ cdk bootstrap
+    cdk bootstrap
     ```
 
 5. Define your configuration

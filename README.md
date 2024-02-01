@@ -61,13 +61,19 @@ This solution was designed to solve a recurring problem with users leaving their
 
 ## How to deploy the stack
 
-1. Create a python virtualenv
+1. Clone the repository
+    ```
+    git clone https://github.com/dalacan/sagemaker-endpoint-manager.git
+    cd sagemaker-endpoint-manager
+    ```
+
+2. Create a python virtualenv
 
     ```
     $ python3 -m venv .venv
     ```
 
-2. Activate your virtual environment
+3. Activate your virtual environment
 
     For Mac/Linux platform:
     ```
@@ -79,13 +85,13 @@ This solution was designed to solve a recurring problem with users leaving their
     ```
     .venv\Scripts\activate.bat
     ```
-3. Install required dependencies
+4. Install required dependencies
 
     ```
     pip install -r requirements.txt
     ```
 
-4. Bootstrap your environment (if required)
+5. Bootstrap your environment (if required)
 
     If you have not previously used CDK, bootstrap your environment
 
@@ -93,10 +99,12 @@ This solution was designed to solve a recurring problem with users leaving their
     cdk bootstrap
     ```
 
-5. Define your configuration
+6. Define your configuration
 
     Setup your Amazon SageMaker Endpoint Manager and configure the models that you'd like to deploy by opening the [`config/config.json`](config/configs.json) file with a text editor. Configure the project settings such as your `project_prefix`, `region_name` - region to deploy the stack and `ddb_auth_table_name`. For more information on the configuration, refer to the [Endpoint manager Configuration section](#endpoint-manager-configurations).
 
+    **IMPORTANT:** The example configuration will deploy to the `us-east-1` region by default. Please set the region_name to your required region.
+ 
     Next define the jumpstart models you'd like to deploy. For more information on the jumpstart model configuration, refer to [jumpstart model configuration section](#example-jumpstart-model-configuration). Below, you can find an example of how to deploy a real-time falcon40b and flan jumpstart model. You will also find additional examples in the [`config/example-configs.json`](config/example-configs.json) file.
     
     ### Example Jumpstart model configuration

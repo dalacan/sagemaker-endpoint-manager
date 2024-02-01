@@ -183,7 +183,7 @@ This solution was designed to solve a recurring problem with users leaving their
                 "start_time": "09:00",
                 "stop_time": "17:00",
                 "days": ["mon", "tue", "wed", "thu", "fri"],
-                "timezone: "Australia/Melbourne"
+                "timezone": "Australia/Melbourne"
             }
         ],
         "integration": {
@@ -208,7 +208,7 @@ This solution was designed to solve a recurring problem with users leaving their
                 "start_time": "09:00",
                 "stop_time": "17:00",
                 "date": "31/12/2023",
-                "timezone: "Australia/Melbourne"
+                "timezone": "Australia/Melbourne"
             }
         ],
         "integration": {
@@ -520,14 +520,14 @@ This section provides further examples on how to configure your endpoint to run 
             "start_time": "09:00",
             "stop_time": "17:00",
             "days": ["mon", "tue", "wed", "thu"],
-            "timezone: "Australia/Melbourne"
+            "timezone": "Australia/Melbourne"
         },
         {
             "name": "workdays-f",
             "start_time": "09:00",
             "stop_time": "12:00",
             "days": ["fri"],
-            "timezone: "Australia/Melbourne"
+            "timezone": "Australia/Melbourne"
         }
     ],
     "integration": {
@@ -552,14 +552,14 @@ This section provides further examples on how to configure your endpoint to run 
             "start_time": "09:00",
             "stop_time": "17:00",
             "date": "01/01/2024",
-            "timezone: "Australia/Melbourne"
+            "timezone": "Australia/Melbourne"
         },
         {
             "name": "event-two",
             "start_time": "09:00",
             "stop_time": "17:00",
             "date": "31/12/2023",
-            "timezone: "Australia/Melbourne"
+            "timezone": "Australia/Melbourne"
         }
     ]
     "integration": {
